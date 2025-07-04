@@ -1,9 +1,10 @@
+
 "use client";
 
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
-import type { Sprint, Ticket, DailySprintData, Team, DailyLog } from '@/types';
+import type { Sprint, Ticket, DailySprintData, Team, DailyLog, TicketStatus, TicketTypeScope } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TaskTable } from './task-table';
@@ -12,13 +13,15 @@ import { ScopeDistributionChart } from './scope-distribution-chart';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen, Upload } from 'lucide-react';
 import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
 import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
 import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
+import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -30,6 +33,9 @@ export default function SprintDashboard() {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+
+  const { toast } = useToast();
 
   // Load sprints from localStorage on initial mount
   useEffect(() => {
@@ -326,6 +332,114 @@ export default function SprintDashboard() {
       })
     );
   };
+  
+  const handleBulkUploadTasks = (tasks: BulkTask[]) => {
+    setSprints(prevSprints =>
+      prevSprints.map(sprint => {
+        if (sprint.id !== selectedSprintId) return sprint;
+
+        const newTickets: Ticket[] = tasks.map(task => {
+          let typeScope: TicketTypeScope = 'Build';
+          if (task.type === 'Bug') {
+            typeScope = 'Run';
+          } else if (task.type === 'Buffer') {
+            typeScope = 'Sprint';
+          }
+          return {
+            ...task,
+            estimation: Number(task.estimation) || 0,
+            typeScope,
+            timeLogged: 0,
+            dailyLogs: [],
+            status: 'To Do',
+          };
+        });
+
+        const existingTicketIds = new Set(sprint.tickets.map(t => t.id));
+        const uniqueNewTickets = newTickets.filter(t => !existingTicketIds.has(t.id));
+
+        const skippedCount = newTickets.length - uniqueNewTickets.length;
+        if (skippedCount > 0) {
+            toast({
+                variant: "default",
+                title: "Duplicate Tickets Skipped",
+                description: `${skippedCount} tasks were skipped as they already exist in the sprint.`,
+            });
+        }
+
+        toast({
+            title: "Bulk Upload Successful",
+            description: `${uniqueNewTickets.length} new tasks have been added to the sprint.`,
+        });
+
+        return {
+          ...sprint,
+          tickets: [...sprint.tickets, ...uniqueNewTickets],
+          lastUpdatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  };
+
+  const handleBulkLogProgress = (logs: BulkProgressLog[]) => {
+    let updatedCount = 0;
+    let notFoundCount = 0;
+    const notFoundIds = new Set<string>();
+
+    setSprints(prevSprints =>
+      prevSprints.map(sprint => {
+        if (sprint.id !== selectedSprintId) return sprint;
+
+        const ticketsMap = new Map(sprint.tickets.map(t => [t.id, { ...t, dailyLogs: [...(t.dailyLogs || [])] }]));
+
+        for (const log of logs) {
+          const ticket = ticketsMap.get(log.ticketId);
+          if (ticket) {
+            const newLog: DailyLog = {
+              date: log.date,
+              loggedHours: Number(log.loggedHours) || 0,
+            };
+
+            const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === log.date);
+            if (existingLogIndex !== -1) {
+              ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
+            } else {
+              ticket.dailyLogs.push(newLog);
+            }
+
+            ticket.status = log.status;
+            ticket.timeLogged = ticket.dailyLogs.reduce((acc, l) => acc + l.loggedHours, 0);
+
+            const wasDone = ticket.completionDate;
+            const isDone = log.status === 'Done';
+
+            if (!wasDone && isDone) {
+              ticket.completionDate = new Date(log.date).toISOString();
+            } else if (wasDone && !isDone) {
+              delete ticket.completionDate;
+            }
+            
+            ticketsMap.set(log.ticketId, ticket);
+            updatedCount++;
+          } else {
+            notFoundCount++;
+            notFoundIds.add(log.ticketId);
+          }
+        }
+
+        return {
+          ...sprint,
+          tickets: Array.from(ticketsMap.values()),
+          lastUpdatedAt: new Date().toISOString(),
+        };
+      })
+    );
+
+     toast({
+        title: "Progress Log Upload Complete",
+        description: `${updatedCount} logs processed. ${notFoundCount} logs for unknown tickets were skipped.`,
+    });
+  };
 
 
   if (!isLoaded) {
@@ -362,6 +476,12 @@ export default function SprintDashboard() {
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} />
+       <BulkUploadDialog
+          isOpen={isBulkUploadOpen}
+          setIsOpen={setIsBulkUploadOpen}
+          onBulkUploadTasks={handleBulkUploadTasks}
+          onBulkLogProgress={handleBulkLogProgress}
+        />
 
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
@@ -435,10 +555,13 @@ export default function SprintDashboard() {
         </Card>
       </section>
 
-       <Card>
+      <Card>
           <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Sprint Tasks</CardTitle>
                <div className="flex items-center gap-2">
+                <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline">
+                    <Upload className="mr-2 h-4 w-4" /> Bulk Upload
+                </Button>
                 <Button onClick={() => setIsLogProgressOpen(true)}>
                     <NotebookPen className="mr-2 h-4 w-4" /> Log Progress
                 </Button>
