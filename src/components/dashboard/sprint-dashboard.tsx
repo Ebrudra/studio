@@ -435,6 +435,31 @@ export default function SprintDashboard() {
         </Card>
       </section>
 
+       <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Sprint Tasks</CardTitle>
+               <div className="flex items-center gap-2">
+                <Button onClick={() => setIsLogProgressOpen(true)}>
+                    <NotebookPen className="mr-2 h-4 w-4" /> Log Progress
+                </Button>
+                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Task
+                </Button>
+                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}>
+                    <BotMessageSquare className="mr-2 h-4 w-4" /> Generate Report
+                </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+              <TaskTable 
+                columns={columns} 
+                data={processedSprint.tickets}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                />
+          </CardContent>
+       </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
            <Card className="h-full">
@@ -468,31 +493,6 @@ export default function SprintDashboard() {
       </div>
 
        <TeamDailyProgress dailyProgress={dailyProgressData} />
-
-       <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Sprint Tasks</CardTitle>
-               <div className="flex items-center gap-2">
-                <Button onClick={() => setIsLogProgressOpen(true)}>
-                    <NotebookPen className="mr-2 h-4 w-4" /> Log Progress
-                </Button>
-                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Task
-                </Button>
-                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}>
-                    <BotMessageSquare className="mr-2 h-4 w-4" /> Generate Report
-                </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-              <TaskTable 
-                columns={columns} 
-                data={processedSprint.tickets}
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                />
-          </CardContent>
-       </Card>
 
     </div>
   );
