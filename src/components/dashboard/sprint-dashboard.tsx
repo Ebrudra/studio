@@ -334,51 +334,66 @@ export default function SprintDashboard() {
   };
   
   const handleBulkUploadTasks = (tasks: BulkTask[]) => {
-    setSprints(prevSprints =>
-      prevSprints.map(sprint => {
-        if (sprint.id !== selectedSprintId) return sprint;
+    const sprintToUpdate = sprints.find(s => s.id === selectedSprintId);
+    if (!sprintToUpdate) return;
 
-        const newTickets: Ticket[] = tasks.map(task => {
-          let typeScope: TicketTypeScope = 'Build';
-          if (task.type === 'Bug') {
-            typeScope = 'Run';
-          } else if (task.type === 'Buffer') {
-            typeScope = 'Sprint';
-          }
-          return {
-            ...task,
-            estimation: Number(task.estimation) || 0,
-            typeScope,
-            timeLogged: 0,
-            dailyLogs: [],
-            status: 'To Do',
-          };
-        });
+    const newTickets: Ticket[] = tasks.map(task => {
+      let typeScope: TicketTypeScope = 'Build';
+      if (task.type === 'Bug') {
+        typeScope = 'Run';
+      } else if (task.type === 'Buffer') {
+        typeScope = 'Sprint';
+      }
+      return {
+        ...task,
+        estimation: Number(task.estimation) || 0,
+        typeScope,
+        timeLogged: 0,
+        dailyLogs: [],
+        status: 'To Do',
+      };
+    });
 
-        const existingTicketIds = new Set(sprint.tickets.map(t => t.id));
-        const uniqueNewTickets = newTickets.filter(t => !existingTicketIds.has(t.id));
+    const existingTicketIds = new Set(sprintToUpdate.tickets.map(t => t.id));
+    const uniqueNewTickets = newTickets.filter(t => !existingTicketIds.has(t.id));
 
-        const skippedCount = newTickets.length - uniqueNewTickets.length;
-        if (skippedCount > 0) {
-            toast({
-                variant: "default",
-                title: "Duplicate Tickets Skipped",
-                description: `${skippedCount} tasks were skipped as they already exist in the sprint.`,
-            });
-        }
+    // Update state only if there are new tickets
+    if (uniqueNewTickets.length > 0) {
+      setSprints(prevSprints =>
+        prevSprints.map(sprint =>
+          sprint.id === selectedSprintId
+            ? {
+                ...sprint,
+                tickets: [...sprint.tickets, ...uniqueNewTickets],
+                lastUpdatedAt: new Date().toISOString(),
+              }
+            : sprint
+        )
+      );
+    }
+    
+    // Trigger toasts after state update
+    const skippedCount = newTickets.length - uniqueNewTickets.length;
+    if (skippedCount > 0) {
+      toast({
+        variant: "default",
+        title: "Duplicate Tickets Skipped",
+        description: `${skippedCount} tasks were skipped as they already exist in the sprint.`,
+      });
+    }
 
-        toast({
-            title: "Bulk Upload Successful",
-            description: `${uniqueNewTickets.length} new tasks have been added to the sprint.`,
-        });
-
-        return {
-          ...sprint,
-          tickets: [...sprint.tickets, ...uniqueNewTickets],
-          lastUpdatedAt: new Date().toISOString(),
-        };
-      })
-    );
+    if (uniqueNewTickets.length > 0) {
+      toast({
+        title: "Bulk Upload Successful",
+        description: `${uniqueNewTickets.length} new tasks have been added to the sprint.`,
+      });
+    } else if (tasks.length > 0) {
+      // If there were tasks but none were new
+      toast({
+          title: "No new tasks added",
+          description: `All ${tasks.length} tasks in the file already exist in the sprint.`,
+      });
+    }
   };
 
   const handleBulkLogProgress = (logs: BulkProgressLog[]) => {
