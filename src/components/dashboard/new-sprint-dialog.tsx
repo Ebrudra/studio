@@ -73,12 +73,11 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
 
     teamsWithCapacity.forEach(team => {
         const personDays = values.teamCapacity[team as Team];
-        // 8h overhead per team's sprint contribution is deducted from build time
-        const teamBuildHours = (personDays * 6) - 8; 
-        const teamRunHours = personDays * 2;
+        const teamBuildHours = personDays * 6; 
+        const teamRunHours = (personDays * 2) - 8; // 8h overhead per team's sprint contribution is deducted from run time
 
         totalBuildCapacity += teamBuildHours > 0 ? teamBuildHours : 0;
-        totalRunCapacity += teamRunHours;
+        totalRunCapacity += teamRunHours > 0 ? teamRunHours : 0;
     });
 
     const totalCapacity = totalBuildCapacity + totalRunCapacity;

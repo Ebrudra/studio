@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
-import { Ticket } from "@/types"
+import { Ticket, TicketStatus, TicketTypeScope } from "@/types"
 import { statuses } from "./data"
 
 export const columns: ColumnDef<Ticket>[] = [
@@ -58,21 +58,21 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Status" />
     ),
     cell: ({ row }) => {
-      const status = statuses.find(
-        (status) => status.value === row.getValue("status")
-      )
+      const status = statuses.find(s => s.value === row.getValue("status"));
+      if (!status) return null;
 
-      if (!status) {
-        return null
-      }
+      const variantMap: Record<TicketStatus, "default" | "secondary" | "destructive" | "success"> = {
+          "To Do": "secondary",
+          "In Progress": "default",
+          "Done": "success",
+          "Blocked": "destructive",
+      };
 
       return (
-        <div className="flex w-[100px] items-center">
-          {status.icon && (
-            <status.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-          )}
-          <span>{status.label}</span>
-        </div>
+        <Badge variant={variantMap[status.value]} className="w-[110px] flex justify-start">
+            {status.icon && <status.icon className="mr-2 h-4 w-4" />}
+            <span>{status.label}</span>
+        </Badge>
       )
     },
     filterFn: (row, id, value) => {
@@ -117,11 +117,22 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Type Scope" />
     ),
     cell: ({ row }) => {
+       const typeScope = row.getValue("typeScope") as TicketTypeScope;
+       const isOutOfScope = row.original.isOutOfScope;
+
+       const variantMap: Record<TicketTypeScope, "default" | "warning" | "secondary"> = {
+           "Build": "default",
+           "Run": "warning",
+           "Sprint": "secondary",
+       };
+       const variant = isOutOfScope ? "destructive" : variantMap[typeScope];
+       const label = isOutOfScope ? "Out of Scope" : typeScope;
+
       return (
         <div className="flex items-center">
-          <Badge variant={row.original.isOutOfScope ? "destructive" : "outline"}>
-            {row.original.isOutOfScope ? "Out of Scope" : row.getValue("typeScope")}
-            </Badge>
+          <Badge variant={variant}>
+            {label}
+          </Badge>
         </div>
       )
     },

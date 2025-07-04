@@ -30,9 +30,7 @@ export function DataTableRowActions<TData>({
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete task: ${task.id}?`)) {
-      onDeleteTask(task.id)
-    }
+    onDeleteTask(task.id)
   }
 
   return (

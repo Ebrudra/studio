@@ -241,17 +241,22 @@ export default function SprintDashboard() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-     updateSprints(prevSprints =>
-      prevSprints.map(sprint =>
-        sprint.id === selectedSprintId
-          ? {
-              ...sprint,
-              tickets: sprint.tickets.filter(t => t.id !== taskId),
-              lastUpdatedAt: new Date().toISOString(),
-            }
-          : sprint
-      )
-    );
+    const task = processedSprint?.tickets.find(t => t.id === taskId);
+    if (!task) return;
+    
+    if (window.confirm(`Are you sure you want to delete task: ${task.id}?`)) {
+      updateSprints(prevSprints =>
+        prevSprints.map(sprint =>
+          sprint.id === selectedSprintId
+            ? {
+                ...sprint,
+                tickets: sprint.tickets.filter(t => t.id !== taskId),
+                lastUpdatedAt: new Date().toISOString(),
+              }
+            : sprint
+        )
+      );
+    }
   };
   
   const handleLogRowAction = (task: Ticket) => {

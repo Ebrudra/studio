@@ -60,7 +60,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
     },
   })
 
-  const { watch, setValue, reset, control } = form
+  const { watch, setValue, reset, control, formState: { touchedFields } } = form
 
   const selectedScope = watch("scope")
   const selectedTicketId = watch("ticketId")
@@ -124,12 +124,12 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   }, [selectedTicketId, sprint.tickets, setValue])
   
    React.useEffect(() => {
-    if (isNewTicket) {
+    if (isNewTicket && !touchedFields.estimation) {
       if (selectedType === 'Bug' || selectedType === 'Buffer') {
-        setValue('estimation', loggedHours)
+        setValue('estimation', loggedHours, { shouldTouch: false })
       }
     }
-  }, [isNewTicket, selectedType, loggedHours, setValue])
+  }, [isNewTicket, selectedType, loggedHours, setValue, touchedFields.estimation])
 
   React.useEffect(() => {
     if (selectedType === 'Bug') {
