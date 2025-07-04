@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -102,7 +103,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
         setValue("estimation", taskToLog.estimation);
         setValue("status", taskToLog.status);
     } else {
-        reset();
+        reset({loggedHours: 0});
     }
   }, [taskToLog, setValue, reset])
 
@@ -115,21 +116,21 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
         setValue("estimation", ticket.estimation)
         setValue("status", ticket.status)
       }
-    } else {
+    } else if (isNewTicket) {
         setValue("type", ticketTypes[0].value)
         setValue("typeScope", typeScopes[0].value)
         setValue("estimation", 0)
         setValue("status", statuses[0].value)
     }
-  }, [selectedTicketId, sprint.tickets, setValue])
+  }, [selectedTicketId, sprint.tickets, setValue, isNewTicket])
   
    React.useEffect(() => {
     if (isNewTicket && !touchedFields.estimation) {
       if (selectedType === 'Bug' || selectedType === 'Buffer') {
-        setValue('estimation', loggedHours, { shouldTouch: false })
+        setValue('estimation', Number(loggedHours) || 0, { shouldTouch: false })
       }
     }
-  }, [isNewTicket, selectedType, loggedHours, setValue, touchedFields.estimation])
+  }, [isNewTicket, selectedType, loggedHours, setValue, touchedFields]);
 
   React.useEffect(() => {
     if (selectedType === 'Bug') {
@@ -144,6 +145,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   const handleClose = () => {
     setIsOpen(false);
     onClose();
+    reset({loggedHours: 0});
   }
 
   const onSubmit = (values: LogProgressData) => {

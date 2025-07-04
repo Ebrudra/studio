@@ -86,12 +86,24 @@ export default function SprintDashboard() {
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    const tickets = selectedSprint.tickets;
-    const bdcTickets = tickets.filter(t => t.typeScope !== 'Sprint');
+    const tickets = selectedSprint.tickets.map(ticket => {
+        const isOutOfScopeStory = ticket.isOutOfScope && ticket.type === 'User story';
+        const isBug = ticket.type === 'Bug';
+        const isBuffer = ticket.type === 'Buffer';
+        
+        // Don't include out-of-scope stories, bugs, or buffers in BDC calculations
+        const bdcScope = !(isOutOfScopeStory || isBug || isBuffer);
+        
+        return { ...ticket, bdcScope };
+    });
+
+    const bdcTickets = tickets.filter(t => t.bdcScope);
     const totalScope = bdcTickets.reduce((acc, ticket) => acc + ticket.estimation, 0);
+
     const completedWork = bdcTickets
       .filter((ticket) => ticket.status === 'Done')
       .reduce((acc, ticket) => acc + ticket.estimation, 0);
+
     const remainingWork = totalScope - completedWork;
     const percentageComplete = totalScope > 0 ? (completedWork / totalScope) * 100 : 0;
     const summaryMetrics = { totalScope, completedWork, remainingWork, percentageComplete };
@@ -175,10 +187,10 @@ export default function SprintDashboard() {
     // 2. Bug Infestation
     const runEffort = processedSprint.tickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
     const runCapacity = processedSprint.runCapacity || 0;
-    if (runCapacity > 0 && runEffort > runCapacity) {
+    if (runCapacity > 0 && runEffort / (processedSprint.totalCapacity || 1) > 0.2) {
          warnings.push({
             title: "Bug Infestation Trend",
-            description: `Total time logged on 'Run' activities (${runEffort}h) has exceeded the planned 'Run' capacity (${runCapacity}h).`
+            description: `Total time logged on 'Run' activities (${runEffort}h) is over 20% of total capacity.`
         });
     }
 
@@ -194,9 +206,14 @@ export default function SprintDashboard() {
     return warnings;
   }, [processedSprint]);
 
-  const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
+  const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo?: { title: string, description: string }) => {
     setPreviousSprints(sprints);
-    setSprints(updateFn);
+    setSprints(currentSprints => {
+      const newSprints = updateFn(currentSprints);
+      // Since `setSprints` is async, we can't reliably show the toast here based on the result.
+      // The toast call is moved to the handler functions.
+      return newSprints;
+    });
   }
 
   const handleRollback = () => {
@@ -363,6 +380,8 @@ export default function SprintDashboard() {
     let processedCount = 0;
     let newTicketsCount = 0;
 
+    logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     updateSprints(prevSprints => {
         return prevSprints.map(sprint => {
             if (sprint.id !== selectedSprintId) return sprint;
@@ -375,19 +394,21 @@ export default function SprintDashboard() {
                 let ticket = ticketsMap.get(log.ticketId);
 
                 if (!ticket) { // Create new ticket if it doesn't exist
-                    if (!log.title || !log.scope || !log.type || log.estimation === undefined) continue;
+                    if (!log.title || !log.scope || !log.type) continue;
                     
-                    let typeScope: TicketTypeScope = 'Build';
+                    let typeScope: TicketTypeScope = log.typeScope || 'Build';
                     if (log.type === 'Bug') typeScope = 'Run';
                     else if (log.type === 'Buffer') typeScope = 'Sprint';
                     
+                    const estimation = Number(log.estimation) || ( (log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
+
                     ticket = {
                         id: log.ticketId,
                         title: log.title,
                         scope: log.scope,
                         type: log.type,
-                        typeScope: log.typeScope || typeScope,
-                        estimation: Number(log.estimation) || 0,
+                        typeScope: typeScope,
+                        estimation: estimation,
                         status: log.status,
                         timeLogged: 0,
                         dailyLogs: [],
