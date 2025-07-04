@@ -3,33 +3,11 @@
 import { ColumnDef } from "@tanstack/react-table"
 
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 
 import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
-import { Ticket, TicketStatus, TicketTypeScope, Team, TicketType } from "@/types"
-import { ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Circle, CircleDot, HelpCircle, XCircle } from "lucide-react"
-
-export const statuses: { value: TicketStatus; label: string; icon: React.ElementType }[] = [
-  { value: "To Do", label: "To Do", icon: Circle },
-  { value: "In Progress", label: "In Progress", icon: CircleDot },
-  { value: "Done", label: "Done", icon: CheckCircle2 },
-  { value: "Blocked", label: "Blocked", icon: XCircle },
-]
-
-export const scopes: { value: Team; label: string }[] = [
-    { value: "Backend", label: "Backend" },
-    { value: "iOS", label: "iOS" },
-    { value: "Web", label: "Web" },
-    { value: "Android", label: "Android" },
-    { value: "Mobile", label: "Mobile" },
-]
-
-export const typeScopes: { value: TicketTypeScope; label: string }[] = [
-    { value: "Build", label: "Build" },
-    { value: "Run", label: "Run" },
-    { value: "Sprint", label: "Sprint" },
-]
+import { Ticket } from "@/types"
+import { statuses } from "./data"
 
 
 export const columns: ColumnDef<Ticket>[] = [
@@ -160,6 +138,16 @@ export const columns: ColumnDef<Ticket>[] = [
           <span>{row.getValue("timeLogged")}</span>
         </div>
       )
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row, table }) => {
+       const { onUpdateTask, onDeleteTask } = table.options.meta as {
+        onUpdateTask: (task: Ticket) => void
+        onDeleteTask: (taskId: string) => void
+      };
+      return <DataTableRowActions row={row} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} />
     },
   },
 ]

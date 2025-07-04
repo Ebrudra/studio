@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
-import { sprints } from '@/lib/data';
+import { sprints as initialSprints } from '@/lib/data';
 import type { Sprint, Ticket } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +11,25 @@ import { BurnDownChart } from './burn-down-chart';
 import { ScopeDistributionChart } from './scope-distribution-chart';
 import { DailyCompletionChart } from './daily-completion-chart';
 import { TeamCapacityTable } from './team-capacity-table';
-import { BarChart, CheckCircle, Clock, GitCommitHorizontal, ListTodo, Users, Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BarChart, CheckCircle, Clock, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Users, Zap } from 'lucide-react';
 import { columns } from './columns';
+import { NewSprintDialog } from './new-sprint-dialog';
+import { AddTaskDialog } from './add-task-dialog';
+import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
 
 export default function SprintDashboard() {
+  const [sprints, setSprints] = useState<Sprint[]>(initialSprints);
   const [selectedSprintId, setSelectedSprintId] = useState<string>(sprints[0].id);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
-    [selectedSprintId]
+    [sprints, selectedSprintId]
   );
   
   useEffect(() => {
@@ -43,12 +52,76 @@ export default function SprintDashboard() {
     return { totalScope, completedWork, remainingWork, percentageComplete };
   }, [selectedSprint]);
 
+  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData'>) => {
+    const newSprint: Sprint = {
+      ...newSprintData,
+      id: `sprint-${sprints.length + 1}`,
+      lastUpdatedAt: new Date().toISOString(),
+      tickets: [],
+      burnDownData: [],
+    };
+    setSprints(prevSprints => [...prevSprints, newSprint]);
+    setSelectedSprintId(newSprint.id);
+  };
+
+  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
+    const newTask: Ticket = { ...newTaskData, timeLogged: 0 };
+    setSprints(prevSprints =>
+      prevSprints.map(sprint =>
+        sprint.id === selectedSprintId
+          ? { ...sprint, tickets: [...sprint.tickets, newTask], lastUpdatedAt: new Date().toISOString() }
+          : sprint
+      )
+    );
+  };
+
+  const handleUpdateTask = (updatedTask: Ticket) => {
+    setSprints(prevSprints =>
+      prevSprints.map(sprint =>
+        sprint.id === selectedSprintId
+          ? {
+              ...sprint,
+              tickets: sprint.tickets.map(t => (t.id === updatedTask.id ? updatedTask : t)),
+              lastUpdatedAt: new Date().toISOString(),
+            }
+          : sprint
+      )
+    );
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+     setSprints(prevSprints =>
+      prevSprints.map(sprint =>
+        sprint.id === selectedSprintId
+          ? {
+              ...sprint,
+              tickets: sprint.tickets.filter(t => t.id !== taskId),
+              lastUpdatedAt: new Date().toISOString(),
+            }
+          : sprint
+      )
+    );
+  };
+
   if (!selectedSprint) {
-    return <div>Loading...</div>;
+    return (
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 flex flex-col items-center justify-center h-screen">
+            <p className="text-muted-foreground mb-4">No sprint selected or available.</p>
+            <Button onClick={() => setIsNewSprintOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Start a New Sprint
+            </Button>
+            <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
+        </div>
+    );
   }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+       <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
+       <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
+       <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} />
+
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Sprint Command Center</h1>
@@ -56,19 +129,25 @@ export default function SprintDashboard() {
             Data last updated at: {lastUpdated ? lastUpdated.toLocaleString() : 'N/A'}
           </p>
         </div>
-        <div className="w-full sm:w-64">
-          <Select value={selectedSprintId} onValueChange={setSelectedSprintId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a sprint" />
-            </SelectTrigger>
-            <SelectContent>
-              {sprints.map((sprint) => (
-                <SelectItem key={sprint.id} value={sprint.id}>
-                  {sprint.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2">
+            <div className="w-full sm:w-64">
+                <Select value={selectedSprintId} onValueChange={setSelectedSprintId}>
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select a sprint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {sprints.map((sprint) => (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                        {sprint.name}
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+            </div>
+             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Sprint
+            </Button>
         </div>
       </header>
 
@@ -148,7 +227,7 @@ export default function SprintDashboard() {
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3">
-             <TeamCapacityTable tickets={selectedSprint.tickets} />
+             <TeamCapacityTable sprint={selectedSprint} />
         </div>
         <div className="lg:col-span-2">
            {/* Placeholder for another chart or info */}
@@ -156,11 +235,24 @@ export default function SprintDashboard() {
       </div>
 
        <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Sprint Tasks</CardTitle>
+               <div className="flex items-center gap-2">
+                <Button onClick={() => setIsAddTaskOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Task
+                </Button>
+                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!selectedSprint.tickets.length}>
+                    <BotMessageSquare className="mr-2 h-4 w-4" /> Generate Report
+                </Button>
+            </div>
           </CardHeader>
           <CardContent>
-              <TaskTable columns={columns} data={selectedSprint.tickets} />
+              <TaskTable 
+                columns={columns} 
+                data={selectedSprint.tickets}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                />
           </CardContent>
        </Card>
 

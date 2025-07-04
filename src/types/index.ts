@@ -31,4 +31,8 @@ export interface Sprint {
   tickets: Ticket[];
   burnDownData: DailySprintData[];
   lastUpdatedAt: string;
+  teamCapacity?: Record<Team, number>;
+  totalCapacity?: number;
+  buildCapacity?: number;
+  runCapacity?: number;
 }

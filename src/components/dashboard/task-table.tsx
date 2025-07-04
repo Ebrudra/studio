@@ -32,11 +32,15 @@ import type { Ticket } from "@/types"
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  onUpdateTask: (task: Ticket) => void
+  onDeleteTask: (taskId: string) => void
 }
 
 export function TaskTable<TData extends Ticket, TValue>({
   columns,
   data,
+  onUpdateTask,
+  onDeleteTask,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -54,6 +58,10 @@ export function TaskTable<TData extends Ticket, TValue>({
       columnVisibility,
       rowSelection,
       columnFilters,
+    },
+    meta: {
+      onUpdateTask,
+      onDeleteTask,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,

@@ -1,6 +1,6 @@
 import type { Sprint, Team } from '@/types';
 
-const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android'];
+export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android', 'Mobile'];
 
 export const sprints: Sprint[] = [
   {
@@ -9,6 +9,16 @@ export const sprints: Sprint[] = [
     startDate: '2024-07-08',
     endDate: '2024-07-21',
     lastUpdatedAt: new Date('2024-07-15T10:00:00Z').toISOString(),
+    teamCapacity: {
+      'Backend': 10,
+      'iOS': 9,
+      'Web': 10,
+      'Android': 8,
+      'Mobile': 5,
+    },
+    totalCapacity: 336,
+    buildCapacity: 268.8,
+    runCapacity: 67.2,
     tickets: [
       { id: 'WIN-5929', title: 'Implement new login flow', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done' },
       { id: 'WIN-5930', title: 'Fix API authentication issue', scope: 'Backend', type: 'Bug', typeScope: 'Run', estimation: 5, timeLogged: 6, status: 'Done' },
