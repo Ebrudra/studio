@@ -3,6 +3,11 @@ export type TicketType = 'User story' | 'Bug' | 'Task' | 'Buffer';
 export type TicketTypeScope = 'Build' | 'Run' | 'Sprint';
 export type TicketStatus = 'To Do' | 'In Progress' | 'Done' | 'Blocked';
 
+export interface DailyLog {
+  date: string; // YYYY-MM-DD
+  loggedHours: number;
+}
+
 export interface Ticket {
   id: string;
   title: string;
@@ -13,6 +18,7 @@ export interface Ticket {
   timeLogged: number;
   status: TicketStatus;
   completionDate?: string;
+  dailyLogs?: DailyLog[];
 }
 
 export interface DailySprintData {

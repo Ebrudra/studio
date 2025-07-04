@@ -33,20 +33,37 @@ const formSchema = z.object({
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
-  timeLogged: z.coerce.number().min(0, "Logged time must be a positive number"),
   status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketStatus[]]),
 })
 
 export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTaskDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: task,
+    // timeLogged is not editable here, so we don't include it in defaultValues
+    // that are based on the form schema.
+    defaultValues: {
+      id: task.id,
+      title: task.title,
+      scope: task.scope,
+      type: task.type,
+      typeScope: task.typeScope,
+      estimation: task.estimation,
+      status: task.status,
+    },
   })
   
   const typeValue = form.watch("type");
 
   React.useEffect(() => {
-    form.reset(task)
+    form.reset({
+      id: task.id,
+      title: task.title,
+      scope: task.scope,
+      type: task.type,
+      typeScope: task.typeScope,
+      estimation: task.estimation,
+      status: task.status,
+    })
   }, [task, form])
 
   React.useEffect(() => {
@@ -61,6 +78,7 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
 
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // We spread the original task to keep fields like timeLogged and dailyLogs intact
     onUpdateTask({ ...task, ...values })
     setIsOpen(false)
   }
@@ -193,19 +211,6 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="timeLogged"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Time Logged (h)</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             
             <DialogFooter>
                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
-import type { Sprint, Ticket, DailySprintData, Team } from '@/types';
+import type { Sprint, Ticket, DailySprintData, Team, DailyLog } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TaskTable } from './task-table';
@@ -12,12 +12,13 @@ import { ScopeDistributionChart } from './scope-distribution-chart';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen } from 'lucide-react';
 import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
 import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
 import { Skeleton } from '../ui/skeleton';
+import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -28,6 +29,7 @@ export default function SprintDashboard() {
   const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
 
   // Load sprints from localStorage on initial mount
   useEffect(() => {
@@ -59,7 +61,8 @@ export default function SprintDashboard() {
   // Set selected sprint
   useEffect(() => {
     if (isLoaded && !selectedSprintId && sprints.length > 0) {
-      setSelectedSprintId(sprints[0].id);
+      const latestSprint = sprints.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+      setSelectedSprintId(latestSprint.id);
     }
   }, [sprints, isLoaded, selectedSprintId]);
 
@@ -150,7 +153,7 @@ export default function SprintDashboard() {
             day: day.day,
             date: day.date,
             ideal: parseFloat((burnDownScope - (index * idealBurnPerDay)).toFixed(2)),
-            actual: remainingScopeForBurn,
+            actual: remainingScopeForBurn < 0 ? 0 : remainingScopeForBurn,
             completed: dayCompletion.completed,
             dailyCompletedByTeam: dayCompletion.dailyCompletedByTeam,
             dailyBuildByTeam: dayCompletion.dailyBuildByTeam,
@@ -179,7 +182,7 @@ export default function SprintDashboard() {
   };
 
   const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
-    const newTask: Ticket = { ...newTaskData, timeLogged: 0 };
+    const newTask: Ticket = { ...newTaskData, timeLogged: 0, dailyLogs: [] };
     setSprints(prevSprints =>
       prevSprints.map(sprint =>
         sprint.id === selectedSprintId
@@ -201,7 +204,7 @@ export default function SprintDashboard() {
             if (!wasDone && isDone) {
               return { ...updatedTask, completionDate: new Date().toISOString() };
             } else if (wasDone && !isDone) {
-              const { completionDate, ...rest } = updatedTask; // remove completion date
+              const { completionDate, ...rest } = updatedTask;
               return rest;
             }
             return updatedTask;
@@ -231,6 +234,77 @@ export default function SprintDashboard() {
       )
     );
   };
+
+  const handleLogProgress = (data: LogProgressData) => {
+    setSprints(prevSprints =>
+      prevSprints.map(sprint => {
+        if (sprint.id !== selectedSprintId) return sprint;
+
+        let newTickets = [...sprint.tickets];
+        const isNewTicket = data.ticketId === 'new-ticket';
+        const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
+        let ticket = newTickets.find(t => t.id === ticketId);
+
+        const newLog: DailyLog = {
+          date: data.date,
+          loggedHours: data.loggedHours,
+        };
+
+        if (isNewTicket) {
+          const newTicket: Ticket = {
+            id: ticketId,
+            title: data.newTicketTitle!,
+            scope: data.scope,
+            type: data.type,
+            typeScope: data.typeScope,
+            estimation: data.estimation,
+            status: data.status,
+            dailyLogs: [newLog],
+            timeLogged: newLog.loggedHours,
+          };
+          if (newTicket.status === 'Done') {
+            newTicket.completionDate = new Date(data.date).toISOString();
+          }
+          newTickets.push(newTicket);
+        } else if (ticket) {
+          const newDailyLogs = [...(ticket.dailyLogs || [])];
+          const existingLogIndex = newDailyLogs.findIndex(l => l.date === data.date);
+
+          if (existingLogIndex !== -1) {
+            newDailyLogs[existingLogIndex].loggedHours += data.loggedHours;
+          } else {
+            newDailyLogs.push(newLog);
+          }
+          
+          const timeLogged = newDailyLogs.reduce((acc, log) => acc + log.loggedHours, 0);
+          const wasDone = ticket.status === 'Done';
+          const isDone = data.status === 'Done';
+
+          let updatedTicket = {
+            ...ticket,
+            status: data.status,
+            dailyLogs: newDailyLogs,
+            timeLogged: timeLogged,
+          };
+
+          if (!wasDone && isDone) {
+            updatedTicket.completionDate = new Date(data.date).toISOString();
+          } else if (wasDone && !isDone) {
+            delete updatedTicket.completionDate;
+          }
+          
+          newTickets = newTickets.map(t => t.id === ticketId ? updatedTicket : t);
+        }
+
+        return {
+          ...sprint,
+          tickets: newTickets,
+          lastUpdatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  };
+
 
   if (!isLoaded) {
     return (
@@ -265,6 +339,7 @@ export default function SprintDashboard() {
        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} />
+       <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} />
 
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
@@ -376,7 +451,10 @@ export default function SprintDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Sprint Tasks</CardTitle>
                <div className="flex items-center gap-2">
-                <Button onClick={() => setIsAddTaskOpen(true)}>
+                <Button onClick={() => setIsLogProgressOpen(true)}>
+                    <NotebookPen className="mr-2 h-4 w-4" /> Log Progress
+                </Button>
+                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Task
                 </Button>
                 <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}>
