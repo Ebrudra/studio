@@ -46,6 +46,19 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
     },
   })
 
+  const typeValue = form.watch("type")
+
+  React.useEffect(() => {
+    if (typeValue === 'Bug') {
+        form.setValue('typeScope', 'Run');
+    } else if (typeValue === 'Buffer') {
+        form.setValue('typeScope', 'Sprint');
+    } else if (typeValue === 'User story' || typeValue === 'Task') {
+        form.setValue('typeScope', 'Build');
+    }
+  }, [typeValue, form]);
+
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     onAddTask({ ...values, timeLogged: 0 })
     setIsOpen(false)

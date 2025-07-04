@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sprint, Ticket, Team } from "@/types"
+import { Sprint } from "@/types"
 import { Progress } from "@/components/ui/progress"
 
 interface TeamCapacityTableProps {
@@ -20,8 +20,12 @@ interface TeamCapacityTableProps {
 
 export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
   const capacityData = useMemo(() => {
-    const teams = Array.from(new Set(sprint.tickets.map(t => t.scope)))
-    return teams.map(team => {
+    const teamsWithTickets = Array.from(new Set(sprint.tickets.map(t => t.scope)))
+    const teamsFromCapacity = sprint.teamCapacity ? Object.keys(sprint.teamCapacity) : []
+    const allTeams = Array.from(new Set([...teamsWithTickets, ...teamsFromCapacity]));
+
+
+    return allTeams.map(team => {
       const teamTickets = sprint.tickets.filter(t => t.scope === team)
       
       const plannedBuild = teamTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0)
@@ -35,7 +39,7 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
 
       return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
     })
-  }, [sprint.tickets])
+  }, [sprint.tickets, sprint.teamCapacity])
 
   const totals = useMemo(() => {
     return capacityData.reduce((acc, data) => {

@@ -17,7 +17,7 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Ticket" />
     ),
     cell: ({ row }) => <div className="w-[80px]">
-        <a href={`https://jira.example.com/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+        <a href={`https://inwidtd.atlassian.net/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             {row.getValue("id")}
         </a>
     </div>,

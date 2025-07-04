@@ -42,13 +42,26 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
     resolver: zodResolver(formSchema),
     defaultValues: task,
   })
+  
+  const typeValue = form.watch("type");
 
   React.useEffect(() => {
     form.reset(task)
   }, [task, form])
 
+  React.useEffect(() => {
+    if (typeValue === 'Bug') {
+        form.setValue('typeScope', 'Run');
+    } else if (typeValue === 'Buffer') {
+        form.setValue('typeScope', 'Sprint');
+    } else if (typeValue === 'User story' || typeValue === 'Task') {
+        form.setValue('typeScope', 'Build');
+    }
+  }, [typeValue, form]);
+
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    onUpdateTask(values)
+    onUpdateTask({ ...task, ...values })
     setIsOpen(false)
   }
 

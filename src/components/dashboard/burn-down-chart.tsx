@@ -2,8 +2,8 @@
 
 import * as React from "react"
 import { useMemo, useState } from "react"
-import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from "recharts"
-import { Sprint, Ticket, Team } from "@/types"
+import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import type { Sprint, Team, DailySprintData } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChartTooltipContent } from "@/components/ui/chart"
 
 interface BurnDownChartProps {
-  sprint: Sprint
+  sprint: Sprint & { burnDownData: DailySprintData[] } // Ensure burnDownData is available
 }
 
 type ScopeFilter = "Total" | "Build" | "Run"
@@ -24,29 +24,25 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
   const teamsInSprint = useMemo(() => [ALL_TEAMS, ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
 
   const filteredData = useMemo(() => {
-    const sprintDurationInDays = sprint.burnDownData.length > 0 ? sprint.burnDownData.length : 10; // Assume 10 working days if no data
-    
+    const sprintDurationInDays = sprint.burnDownData.length;
+    if (sprintDurationInDays === 0) return [];
+
     let filteredTickets = sprint.tickets
-    if (scopeFilter !== "Total") {
-      filteredTickets = filteredTickets.filter(t => t.typeScope === scopeFilter)
-    }
     if (teamFilter !== ALL_TEAMS) {
       filteredTickets = filteredTickets.filter(t => t.scope === teamFilter)
     }
+     if (scopeFilter !== "Total") {
+      filteredTickets = filteredTickets.filter(t => t.typeScope === scopeFilter)
+    }
 
     const totalScope = filteredTickets.reduce((acc, t) => acc + t.estimation, 0)
-    const idealBurnPerDay = totalScope / (sprintDurationInDays - 1)
+    const idealBurnPerDay = totalScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
 
-    // Recalculate actual burndown based on filters
     const dailyCompletion = new Map<string, number>()
     for (const ticket of filteredTickets) {
-      if (ticket.status === 'Done') {
-        // This is a simplification. In a real scenario, you'd have completion dates for tickets.
-        // We'll distribute completed work over the sprint for this mock.
-        const completionDay = sprint.burnDownData[Math.floor(Math.random() * (sprint.burnDownData.length -1)) + 1]?.date;
-        if(completionDay) {
-          dailyCompletion.set(completionDay, (dailyCompletion.get(completionDay) || 0) + ticket.estimation)
-        }
+      if (ticket.status === 'Done' && ticket.completionDate) {
+        const completionDay = ticket.completionDate.split('T')[0]
+        dailyCompletion.set(completionDay, (dailyCompletion.get(completionDay) || 0) + ticket.estimation)
       }
     }
 
@@ -54,12 +50,16 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
     return sprint.burnDownData.map((dayData, index) => {
       const completedToday = dailyCompletion.get(dayData.date) || 0
       remainingScope -= completedToday
+      
+      const dayDate = new Date(dayData.date);
+      // Adjust for timezone offset to prevent off-by-one day errors
+      const adjustedDate = new Date(dayDate.valueOf() + dayDate.getTimezoneOffset() * 60 * 1000);
+
       return {
         name: `Day ${dayData.day}`,
         "Ideal Burn": (totalScope - (index * idealBurnPerDay)).toFixed(2),
-        "Actual Burn": remainingScope,
-        "Daily Done": completedToday,
-        date: new Date(dayData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        "Actual Burn": remainingScope < 0 ? 0 : remainingScope,
+        date: adjustedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       }
     })
   }, [sprint, scopeFilter, teamFilter])
@@ -101,7 +101,7 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
           <LineChart data={filteredData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} label={{ value: 'Hours Remaining', angle: -90, position: 'insideLeft', fill: 'hsl(var(--foreground))' }} />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 'dataMax']} label={{ value: 'Hours Remaining', angle: -90, position: 'insideLeft', fill: 'hsl(var(--foreground))' }} />
             <Tooltip
               content={({ active, payload, label }) => {
                  if (active && payload && payload.length) {
@@ -111,7 +111,6 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
                             <p className="font-bold">{label} ({data.date})</p>
                             <p style={{ color: payload[0].color }}>{payload[0].name}: {payload[0].value}h</p>
                             <p style={{ color: payload[1].color }}>{payload[1].name}: {payload[1].value}h</p>
-                            <p className="text-muted-foreground">Daily Done: {data['Daily Done']}h</p>
                         </div>
                     );
                 }

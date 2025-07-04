@@ -12,6 +12,7 @@ export interface Ticket {
   estimation: number;
   timeLogged: number;
   status: TicketStatus;
+  completionDate?: string;
 }
 
 export interface DailySprintData {
@@ -21,6 +22,8 @@ export interface DailySprintData {
   actual: number;
   completed: number;
   dailyCompletedByTeam: Record<Team, number>;
+  dailyBuildByTeam: Record<Team, number>;
+  dailyRunByTeam: Record<Team, number>;
 }
 
 export interface Sprint {

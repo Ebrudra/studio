@@ -2,30 +2,66 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
-import { sprints as initialSprints } from '@/lib/data';
-import type { Sprint, Ticket } from '@/types';
+import { sprints as initialSprints, teams } from '@/lib/data';
+import type { Sprint, Ticket, DailySprintData, Team } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TaskTable } from './task-table';
 import { BurnDownChart } from './burn-down-chart';
 import { ScopeDistributionChart } from './scope-distribution-chart';
-import { DailyCompletionChart } from './daily-completion-chart';
 import { TeamCapacityTable } from './team-capacity-table';
+import { TeamDailyProgress } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { BarChart, CheckCircle, Clock, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Users, Zap } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap } from 'lucide-react';
 import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
 import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
+import { Skeleton } from '../ui/skeleton';
 
 export default function SprintDashboard() {
-  const [sprints, setSprints] = useState<Sprint[]>(initialSprints);
-  const [selectedSprintId, setSelectedSprintId] = useState<string>(sprints[0].id);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [selectedSprintId, setSelectedSprintId] = useState<string | undefined>();
+  const [isLoaded, setIsLoaded] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+
+  // Load sprints from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const storedSprints = localStorage.getItem('sprintPilotSprints');
+      if (storedSprints) {
+        setSprints(JSON.parse(storedSprints));
+      } else {
+        setSprints(initialSprints);
+      }
+    } catch (error) {
+      console.error("Failed to load sprints from localStorage", error);
+      setSprints(initialSprints);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save sprints to localStorage whenever they change
+  useEffect(() => {
+    if (isLoaded) {
+      try {
+        localStorage.setItem('sprintPilotSprints', JSON.stringify(sprints));
+      } catch (error) {
+        console.error("Failed to save sprints to localStorage", error);
+      }
+    }
+  }, [sprints, isLoaded]);
+  
+  // Set selected sprint
+  useEffect(() => {
+    if (isLoaded && !selectedSprintId && sprints.length > 0) {
+      setSelectedSprintId(sprints[0].id);
+    }
+  }, [sprints, isLoaded, selectedSprintId]);
 
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
@@ -38,9 +74,10 @@ export default function SprintDashboard() {
     }
   }, [selectedSprint]);
 
-  const summaryMetrics = useMemo(() => {
-    if (!selectedSprint) return { totalScope: 0, completedWork: 0, remainingWork: 0, percentageComplete: 0 };
-    
+  const processedSprint = useMemo(() => {
+    if (!selectedSprint) return null;
+
+    // Summary Metrics
     const tickets = selectedSprint.tickets.filter(t => t.typeScope !== 'Sprint');
     const totalScope = tickets.reduce((acc, ticket) => acc + ticket.estimation, 0);
     const completedWork = tickets
@@ -48,14 +85,91 @@ export default function SprintDashboard() {
       .reduce((acc, ticket) => acc + ticket.estimation, 0);
     const remainingWork = totalScope - completedWork;
     const percentageComplete = totalScope > 0 ? (completedWork / totalScope) * 100 : 0;
+    const summaryMetrics = { totalScope, completedWork, remainingWork, percentageComplete };
+
+    // Dynamic Burn-down Data
+    const startDate = new Date(selectedSprint.startDate);
+    const endDate = new Date(selectedSprint.endDate);
+    const sprintDays: { date: string, day: number }[] = [];
+    let currentDate = new Date(startDate);
+    let dayCount = 1;
+
+    // Adjust for timezone to prevent date misalignments
+    const getLocalDate = (date: Date) => new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
+
+    while (getLocalDate(currentDate) <= getLocalDate(endDate)) {
+        sprintDays.push({ date: currentDate.toISOString().split('T')[0], day: dayCount++ });
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const burnDownScope = selectedSprint.tickets
+        .filter(t => t.typeScope !== 'Sprint')
+        .reduce((acc, ticket) => acc + ticket.estimation, 0);
+    const idealBurnPerDay = sprintDays.length > 1 ? burnDownScope / (sprintDays.length - 1) : burnDownScope;
     
-    return { totalScope, completedWork, remainingWork, percentageComplete };
+    const dailyCompletions = new Map<string, {
+        completed: number,
+        dailyCompletedByTeam: Record<Team, number>,
+        dailyBuildByTeam: Record<Team, number>,
+        dailyRunByTeam: Record<Team, number>
+    }>();
+
+    for (const ticket of selectedSprint.tickets) {
+        if (ticket.status === 'Done' && ticket.completionDate) {
+            const completionDateStr = ticket.completionDate.split('T')[0];
+            if (!dailyCompletions.has(completionDateStr)) {
+                dailyCompletions.set(completionDateStr, {
+                    completed: 0,
+                    dailyCompletedByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+                    dailyBuildByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+                    dailyRunByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+                });
+            }
+            const dayCompletion = dailyCompletions.get(completionDateStr)!;
+            dayCompletion.completed += ticket.estimation;
+            dayCompletion.dailyCompletedByTeam[ticket.scope] = (dayCompletion.dailyCompletedByTeam[ticket.scope] || 0) + ticket.estimation;
+            if(ticket.typeScope === 'Build') {
+                dayCompletion.dailyBuildByTeam[ticket.scope] = (dayCompletion.dailyBuildByTeam[ticket.scope] || 0) + ticket.estimation;
+            }
+            if(ticket.typeScope === 'Run') {
+                dayCompletion.dailyRunByTeam[ticket.scope] = (dayCompletion.dailyRunByTeam[ticket.scope] || 0) + ticket.estimation;
+            }
+        }
+    }
+
+    let remainingScopeForBurn = burnDownScope;
+    const burnDownData: DailySprintData[] = sprintDays.map((day, index) => {
+        const dayCompletion = dailyCompletions.get(day.date) || {
+            completed: 0,
+            dailyCompletedByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+            dailyBuildByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+            dailyRunByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
+        };
+        remainingScopeForBurn -= dayCompletion.completed;
+        return {
+            day: day.day,
+            date: day.date,
+            ideal: parseFloat((burnDownScope - (index * idealBurnPerDay)).toFixed(2)),
+            actual: remainingScopeForBurn,
+            completed: dayCompletion.completed,
+            dailyCompletedByTeam: dayCompletion.dailyCompletedByTeam,
+            dailyBuildByTeam: dayCompletion.dailyBuildByTeam,
+            dailyRunByTeam: dayCompletion.dailyRunByTeam
+        }
+    });
+
+    return {
+      ...selectedSprint,
+      summaryMetrics,
+      burnDownData,
+    }
+
   }, [selectedSprint]);
 
   const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData'>) => {
     const newSprint: Sprint = {
       ...newSprintData,
-      id: `sprint-${sprints.length + 1}`,
+      id: `sprint-${sprints.length + 1}-${Date.now()}`,
       lastUpdatedAt: new Date().toISOString(),
       tickets: [],
       burnDownData: [],
@@ -77,15 +191,30 @@ export default function SprintDashboard() {
 
   const handleUpdateTask = (updatedTask: Ticket) => {
     setSprints(prevSprints =>
-      prevSprints.map(sprint =>
-        sprint.id === selectedSprintId
-          ? {
-              ...sprint,
-              tickets: sprint.tickets.map(t => (t.id === updatedTask.id ? updatedTask : t)),
-              lastUpdatedAt: new Date().toISOString(),
+      prevSprints.map(sprint => {
+        if (sprint.id !== selectedSprintId) return sprint;
+
+        const newTickets = sprint.tickets.map(t => {
+          if (t.id === updatedTask.id) {
+            const wasDone = t.status === 'Done';
+            const isDone = updatedTask.status === 'Done';
+            if (!wasDone && isDone) {
+              return { ...updatedTask, completionDate: new Date().toISOString() };
+            } else if (wasDone && !isDone) {
+              const { completionDate, ...rest } = updatedTask; // remove completion date
+              return rest;
             }
-          : sprint
-      )
+            return updatedTask;
+          }
+          return t;
+        });
+        
+        return {
+          ...sprint,
+          tickets: newTickets,
+          lastUpdatedAt: new Date().toISOString(),
+        };
+      })
     );
   };
 
@@ -103,7 +232,22 @@ export default function SprintDashboard() {
     );
   };
 
-  if (!selectedSprint) {
+  if (!isLoaded) {
+    return (
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+            <Skeleton className="h-12 w-1/3" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+            </div>
+            <Skeleton className="h-96 w-full" />
+        </div>
+    )
+  }
+
+  if (!processedSprint || !selectedSprint) {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 flex flex-col items-center justify-center h-screen">
             <p className="text-muted-foreground mb-4">No sprint selected or available.</p>
@@ -158,7 +302,7 @@ export default function SprintDashboard() {
             <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.totalScope}h</div>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope}h</div>
             <p className="text-xs text-muted-foreground">Initial estimated hours</p>
           </CardContent>
         </Card>
@@ -168,8 +312,8 @@ export default function SprintDashboard() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.completedWork}h</div>
-            <p className="text-xs text-muted-foreground">Of {summaryMetrics.totalScope}h total</p>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.completedWork}h</div>
+            <p className="text-xs text-muted-foreground">Of {processedSprint.summaryMetrics.totalScope}h total</p>
           </CardContent>
         </Card>
         <Card>
@@ -178,7 +322,7 @@ export default function SprintDashboard() {
             <ListTodo className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.remainingWork}h</div>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork}h</div>
             <p className="text-xs text-muted-foreground">To be completed</p>
           </CardContent>
         </Card>
@@ -188,7 +332,7 @@ export default function SprintDashboard() {
             <Zap className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.percentageComplete.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">Sprint progress</p>
           </CardContent>
         </Card>
@@ -201,7 +345,7 @@ export default function SprintDashboard() {
                 <CardTitle>Sprint Burn-down</CardTitle>
             </CardHeader>
             <CardContent>
-                <BurnDownChart sprint={selectedSprint} />
+                <BurnDownChart sprint={processedSprint} />
             </CardContent>
            </Card>
         </div>
@@ -211,28 +355,22 @@ export default function SprintDashboard() {
                     <CardTitle>Scope Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <ScopeDistributionChart tickets={selectedSprint.tickets} />
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Daily Work Completed by Team</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <DailyCompletionChart sprint={selectedSprint} />
+                    <ScopeDistributionChart tickets={processedSprint.tickets} />
                 </CardContent>
             </Card>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3">
-             <TeamCapacityTable sprint={selectedSprint} />
+       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 space-y-6">
+             <TeamCapacityTable sprint={processedSprint} />
         </div>
-        <div className="lg:col-span-2">
-           {/* Placeholder for another chart or info */}
+         <div className="lg:col-span-2 space-y-6">
+            {/* Placeholder */}
         </div>
       </div>
+
+       <TeamDailyProgress burnDownData={processedSprint.burnDownData} />
 
        <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -241,7 +379,7 @@ export default function SprintDashboard() {
                 <Button onClick={() => setIsAddTaskOpen(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Task
                 </Button>
-                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!selectedSprint.tickets.length}>
+                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}>
                     <BotMessageSquare className="mr-2 h-4 w-4" /> Generate Report
                 </Button>
             </div>
@@ -249,7 +387,7 @@ export default function SprintDashboard() {
           <CardContent>
               <TaskTable 
                 columns={columns} 
-                data={selectedSprint.tickets}
+                data={processedSprint.tickets}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 />
