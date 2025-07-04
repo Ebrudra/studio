@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -16,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import type { Team, TicketType, TicketStatus } from "@/types"
+import type { Team, TicketType, TicketStatus, TicketTypeScope } from "@/types"
 
 export type BulkTask = {
   id: string
@@ -26,11 +25,17 @@ export type BulkTask = {
   estimation: number
 }
 
+// Progress logs can also create new tickets, so we include optional fields
 export type BulkProgressLog = {
   date: string // YYYY-MM-DD
   ticketId: string
   loggedHours: number
   status: TicketStatus
+  title?: string
+  scope?: Team
+  type?: TicketType
+  typeScope?: TicketTypeScope
+  estimation?: number
 }
 
 interface BulkUploadDialogProps {
@@ -66,7 +71,7 @@ export function BulkUploadDialog({
       csvContent = "id,title,scope,type,estimation\nWIN-9001,New Feature X,Web,User story,13\nWIN-9002,Fix Critical Bug Y,Backend,Bug,8"
       fileName = "tasks_sample.csv"
     } else {
-      csvContent = "date,ticketId,loggedHours,status\n2024-07-25,WIN-9001,4,In Progress\n2024-07-26,WIN-9001,8,Done"
+      csvContent = "date,ticketId,loggedHours,status,title,scope,type,estimation\n2024-07-25,WIN-9001,4,In Progress,,,\n2024-07-26,WIN-9999,5,To Do,New urgent bug fix,Backend,Bug,5"
       fileName = "progress_log_sample.csv"
     }
 
@@ -148,7 +153,7 @@ export function BulkUploadDialog({
               <Input id="progress-file" type="file" accept=".csv" onChange={(e) => handleFileChange(e, "progress")} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Required columns: `date`, `ticketId`, `loggedHours`, `status`.
+              Required: `date`, `ticketId`, `loggedHours`, `status`. Optional for new tickets: `title`, `scope`, `type`, `estimation`.
             </p>
             <div className="flex justify-between items-center">
                  <Button variant="link" size="sm" className="p-0" onClick={() => downloadSampleCSV("progress")}>

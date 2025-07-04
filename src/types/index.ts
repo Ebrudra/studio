@@ -1,4 +1,4 @@
-export type Team = 'Backend' | 'iOS' | 'Web' | 'Android' | 'Mobile';
+export type Team = 'Backend' | 'iOS' | 'Web' | 'Android' | 'Mobile' | 'Out of Scope';
 export type TicketType = 'User story' | 'Bug' | 'Task' | 'Buffer';
 export type TicketTypeScope = 'Build' | 'Run' | 'Sprint';
 export type TicketStatus = 'To Do' | 'In Progress' | 'Done' | 'Blocked';
@@ -19,6 +19,7 @@ export interface Ticket {
   status: TicketStatus;
   completionDate?: string;
   dailyLogs?: DailyLog[];
+  isOutOfScope?: boolean;
 }
 
 export interface DailySprintData {

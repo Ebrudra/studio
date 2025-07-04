@@ -4,14 +4,13 @@ import * as React from "react"
 import { useMemo, useState } from "react"
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import type { Sprint, Team, DailySprintData } from "@/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChartTooltipContent } from "@/components/ui/chart"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface BurnDownChartProps {
-  sprint: Sprint & { burnDownData: DailySprintData[] } // Ensure burnDownData is available
+  sprint: Sprint & { burnDownData: DailySprintData[] }
 }
 
 type ScopeFilter = "Total" | "Build" | "Run"
@@ -20,10 +19,18 @@ const ALL_TEAMS = "All Teams"
 export function BurnDownChart({ sprint }: BurnDownChartProps) {
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("Total")
   const [teamFilter, setTeamFilter] = useState<Team | "All Teams">(ALL_TEAMS)
+  const [showFullProjection, setShowFullProjection] = useState(false)
+  
+  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
 
   const teamsInSprint = useMemo(() => [ALL_TEAMS, ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
 
-  const filteredData = useMemo(() => {
+  const chartData = useMemo(() => {
+    let rawData = sprint.burnDownData;
+    if (!showFullProjection) {
+        rawData = sprint.burnDownData.filter(d => d.date <= today)
+    }
+
     const sprintDurationInDays = sprint.burnDownData.length;
     if (sprintDurationInDays === 0) return [];
 
@@ -33,6 +40,9 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
     }
      if (scopeFilter !== "Total") {
       filteredTickets = filteredTickets.filter(t => t.typeScope === scopeFilter)
+    } else {
+      // Exclude sprint buffers from total
+      filteredTickets = filteredTickets.filter(t => t.typeScope !== 'Sprint')
     }
 
     const totalScope = filteredTickets.reduce((acc, t) => acc + t.estimation, 0)
@@ -47,28 +57,30 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
     }
 
     let remainingScope = totalScope
-    return sprint.burnDownData.map((dayData, index) => {
+    const processedData = sprint.burnDownData.map((dayData, index) => {
       const completedToday = dailyCompletion.get(dayData.date) || 0
       remainingScope -= completedToday
       
-      const dayDate = new Date(dayData.date);
-      // Adjust for timezone offset to prevent off-by-one day errors
-      const adjustedDate = new Date(dayDate.valueOf() + dayDate.getTimezoneOffset() * 60 * 1000);
-
       return {
         name: `Day ${dayData.day}`,
-        "Ideal Burn": (totalScope - (index * idealBurnPerDay)).toFixed(2),
+        "Ideal Burn": parseFloat((totalScope - (index * idealBurnPerDay)).toFixed(2)),
         "Actual Burn": remainingScope < 0 ? 0 : remainingScope,
-        date: adjustedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        date: dayData.date
       }
     })
-  }, [sprint, scopeFilter, teamFilter])
+    
+    if (!showFullProjection) {
+        return processedData.filter(d => d.date <= today)
+    }
+    return processedData
+
+  }, [sprint, scopeFilter, teamFilter, showFullProjection, today])
 
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row gap-4 justify-between mb-4">
-        <div className="flex items-center space-x-4">
-            <RadioGroup defaultValue="Total" onValueChange={(value: ScopeFilter) => setScopeFilter(value)} className="flex items-center">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <RadioGroup defaultValue="Total" value={scopeFilter} onValueChange={(value: ScopeFilter) => setScopeFilter(value)} className="flex items-center">
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="Total" id="total" />
                     <Label htmlFor="total">Total</Label>
@@ -82,6 +94,10 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
                     <Label htmlFor="run">Run</Label>
                 </div>
             </RadioGroup>
+            <div className="flex items-center space-x-2">
+                <Checkbox id="show-projection" checked={showFullProjection} onCheckedChange={(checked) => setShowFullProjection(!!checked)} />
+                <Label htmlFor="show-projection" className="text-sm">Show Full Projection</Label>
+            </div>
         </div>
         <div className="w-full sm:w-48">
           <Select value={teamFilter} onValueChange={(value: Team | "All Teams") => setTeamFilter(value)}>
@@ -98,7 +114,7 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
       </div>
       <div className="h-[350px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={filteredData}>
+          <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
             <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 'dataMax']} label={{ value: 'Hours Remaining', angle: -90, position: 'insideLeft', fill: 'hsl(var(--foreground))' }} />
@@ -106,11 +122,12 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
               content={({ active, payload, label }) => {
                  if (active && payload && payload.length) {
                     const data = payload[0].payload;
+                    const displayDate = new Date(data.date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
                     return (
                         <div className="p-2 bg-background border rounded-lg shadow-sm">
-                            <p className="font-bold">{label} ({data.date})</p>
-                            <p style={{ color: payload[0].color }}>{payload[0].name}: {payload[0].value}h</p>
-                            <p style={{ color: payload[1].color }}>{payload[1].name}: {payload[1].value}h</p>
+                            <p className="font-bold">{label} ({displayDate})</p>
+                            <p style={{ color: payload[1].color }}>{payload[1].name}: {Number(payload[1].value).toFixed(2)}h</p>
+                             <p style={{ color: payload[0].color }}>{payload[0].name}: {Number(payload[0].value).toFixed(2)}h</p>
                         </div>
                     );
                 }

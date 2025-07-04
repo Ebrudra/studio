@@ -26,6 +26,8 @@ interface LogProgressDialogProps {
   setIsOpen: (isOpen: boolean) => void
   sprint: Sprint
   onLogProgress: (data: LogProgressData) => void
+  taskToLog?: Ticket | null
+  onClose: () => void
 }
 
 const formSchema = z.object({
@@ -50,7 +52,7 @@ const formSchema = z.object({
 });
 
 
-export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: LogProgressDialogProps) {
+export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, taskToLog, onClose }: LogProgressDialogProps) {
   const form = useForm<LogProgressData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -92,6 +94,19 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
   }, [sprint.tickets, selectedScope])
 
   React.useEffect(() => {
+    if (taskToLog) {
+        setValue("scope", taskToLog.scope);
+        setValue("ticketId", taskToLog.id);
+        setValue("type", taskToLog.type);
+        setValue("typeScope", taskToLog.typeScope);
+        setValue("estimation", taskToLog.estimation);
+        setValue("status", taskToLog.status);
+    } else {
+        reset();
+    }
+  }, [taskToLog, setValue, reset])
+
+  React.useEffect(() => {
     if (selectedTicketId && selectedTicketId !== 'new-ticket') {
       const ticket = sprint.tickets.find(t => t.id === selectedTicketId)
       if (ticket) {
@@ -101,7 +116,6 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
         setValue("status", ticket.status)
       }
     } else {
-        // Reset if new ticket is selected
         setValue("type", ticketTypes[0].value)
         setValue("typeScope", typeScopes[0].value)
         setValue("estimation", 0)
@@ -127,14 +141,18 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
     }
   }, [selectedType, setValue]);
 
+  const handleClose = () => {
+    setIsOpen(false);
+    onClose();
+  }
+
   const onSubmit = (values: LogProgressData) => {
     onLogProgress(values)
-    setIsOpen(false)
-    reset()
+    handleClose()
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>Log Daily Progress</DialogTitle>
@@ -151,7 +169,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Scope (Team)</FormLabel>
-                        <Select onValueChange={(v) => { field.onChange(v); setValue("ticketId", ""); }} defaultValue={field.value}>
+                        <Select onValueChange={(v) => { field.onChange(v); setValue("ticketId", ""); }} value={field.value} disabled={!!taskToLog}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
                         </FormControl>
@@ -169,7 +187,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Ticket</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedScope}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedScope || !!taskToLog}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a ticket" /></SelectTrigger>
                         </FormControl>
@@ -315,7 +333,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress }: 
             </div>
             
             <DialogFooter>
-               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+               <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
               <Button type="submit">Log Progress</Button>
             </DialogFooter>
           </form>

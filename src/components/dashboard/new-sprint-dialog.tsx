@@ -64,11 +64,24 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
   }, [startDate, endDate, setValue]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const totalDays = Object.values(values.teamCapacity).reduce((acc, days) => acc + days, 0)
-    const effectiveDays = totalDays > 0 ? totalDays - 1 : 0; // -1 day for ceremonies
-    const totalCapacity = effectiveDays * 8
-    const buildCapacity = totalCapacity * 0.8
-    const runCapacity = totalCapacity * 0.2
+    let totalBuildCapacity = 0;
+    let totalRunCapacity = 0;
+
+    const teamsWithCapacity = Object.keys(values.teamCapacity).filter(
+      (team) => values.teamCapacity[team as Team] > 0
+    );
+
+    teamsWithCapacity.forEach(team => {
+        const personDays = values.teamCapacity[team as Team];
+        // 8h overhead per team's sprint contribution is deducted from build time
+        const teamBuildHours = (personDays * 6) - 8; 
+        const teamRunHours = personDays * 2;
+
+        totalBuildCapacity += teamBuildHours > 0 ? teamBuildHours : 0;
+        totalRunCapacity += teamRunHours;
+    });
+
+    const totalCapacity = totalBuildCapacity + totalRunCapacity;
 
     onCreateSprint({
       name: values.name,
@@ -76,8 +89,8 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       endDate: values.endDate.toISOString(),
       teamCapacity: values.teamCapacity,
       totalCapacity,
-      buildCapacity,
-      runCapacity,
+      buildCapacity: totalBuildCapacity,
+      runCapacity: totalRunCapacity,
     })
     setIsOpen(false)
     form.reset()

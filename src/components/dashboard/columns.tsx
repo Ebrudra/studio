@@ -1,14 +1,13 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-
+import { AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
 import { Ticket } from "@/types"
 import { statuses } from "./data"
-
 
 export const columns: ColumnDef<Ticket>[] = [
   {
@@ -30,9 +29,23 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Title" />
     ),
     cell: ({ row }) => {
+      const ticket = row.original
+      const isOverEstimation = ticket.timeLogged > ticket.estimation && ticket.estimation > 0
       return (
-        <div className="flex space-x-2">
-          <span className="max-w-[500px] truncate font-medium">
+        <div className="flex space-x-2 items-center">
+            {isOverEstimation && (
+                 <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Logged time has exceeded estimation.</p>
+                        </TooltipContent>
+                    </Tooltip>
+                 </TooltipProvider>
+            )}
+          <span className="max-w-[450px] truncate font-medium">
             {row.getValue("title")}
           </span>
         </div>
@@ -106,7 +119,9 @@ export const columns: ColumnDef<Ticket>[] = [
     cell: ({ row }) => {
       return (
         <div className="flex items-center">
-          <Badge variant="outline">{row.getValue("typeScope")}</Badge>
+          <Badge variant={row.original.isOutOfScope ? "destructive" : "outline"}>
+            {row.original.isOutOfScope ? "Out of Scope" : row.getValue("typeScope")}
+            </Badge>
         </div>
       )
     },
@@ -143,11 +158,12 @@ export const columns: ColumnDef<Ticket>[] = [
   {
     id: "actions",
     cell: ({ row, table }) => {
-       const { onUpdateTask, onDeleteTask } = table.options.meta as {
+       const { onUpdateTask, onDeleteTask, onLogTime } = table.options.meta as {
         onUpdateTask: (task: Ticket) => void
         onDeleteTask: (taskId: string) => void
+        onLogTime: (task: Ticket) => void
       };
-      return <DataTableRowActions row={row} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} />
+      return <DataTableRowActions row={row} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onLogTime={onLogTime} />
     },
   },
 ]

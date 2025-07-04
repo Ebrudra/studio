@@ -34,6 +34,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   onUpdateTask: (task: Ticket) => void
   onDeleteTask: (taskId: string) => void
+  onLogTime: (task: Ticket) => void
 }
 
 export function TaskTable<TData extends Ticket, TValue>({
@@ -41,6 +42,7 @@ export function TaskTable<TData extends Ticket, TValue>({
   data,
   onUpdateTask,
   onDeleteTask,
+  onLogTime,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -62,6 +64,7 @@ export function TaskTable<TData extends Ticket, TValue>({
     meta: {
       onUpdateTask,
       onDeleteTask,
+      onLogTime,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
