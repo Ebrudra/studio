@@ -112,9 +112,6 @@ export default function SprintDashboard() {
     
     const dailyCompletions = new Map<string, {
         completed: number,
-        dailyCompletedByTeam: Record<Team, number>,
-        dailyBuildByTeam: Record<Team, number>,
-        dailyRunByTeam: Record<Team, number>
     }>();
 
     for (const ticket of selectedSprint.tickets) {
@@ -123,31 +120,16 @@ export default function SprintDashboard() {
             if (!dailyCompletions.has(completionDateStr)) {
                 dailyCompletions.set(completionDateStr, {
                     completed: 0,
-                    dailyCompletedByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
-                    dailyBuildByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
-                    dailyRunByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
                 });
             }
             const dayCompletion = dailyCompletions.get(completionDateStr)!;
             dayCompletion.completed += ticket.estimation;
-            dayCompletion.dailyCompletedByTeam[ticket.scope] = (dayCompletion.dailyCompletedByTeam[ticket.scope] || 0) + ticket.estimation;
-            if(ticket.typeScope === 'Build') {
-                dayCompletion.dailyBuildByTeam[ticket.scope] = (dayCompletion.dailyBuildByTeam[ticket.scope] || 0) + ticket.estimation;
-            }
-            if(ticket.typeScope === 'Run') {
-                dayCompletion.dailyRunByTeam[ticket.scope] = (dayCompletion.dailyRunByTeam[ticket.scope] || 0) + ticket.estimation;
-            }
         }
     }
 
     let remainingScopeForBurn = burnDownScope;
     const burnDownData: DailySprintData[] = sprintDays.map((day, index) => {
-        const dayCompletion = dailyCompletions.get(day.date) || {
-            completed: 0,
-            dailyCompletedByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
-            dailyBuildByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
-            dailyRunByTeam: teams.reduce((acc, team) => ({...acc, [team]: 0}), {} as Record<Team, number>),
-        };
+        const dayCompletion = dailyCompletions.get(day.date) || { completed: 0 };
         remainingScopeForBurn -= dayCompletion.completed;
         return {
             day: day.day,
@@ -155,9 +137,10 @@ export default function SprintDashboard() {
             ideal: parseFloat((burnDownScope - (index * idealBurnPerDay)).toFixed(2)),
             actual: remainingScopeForBurn < 0 ? 0 : remainingScopeForBurn,
             completed: dayCompletion.completed,
-            dailyCompletedByTeam: dayCompletion.dailyCompletedByTeam,
-            dailyBuildByTeam: dayCompletion.dailyBuildByTeam,
-            dailyRunByTeam: dayCompletion.dailyRunByTeam
+            // These fields are no longer needed here as they are computed for the new daily progress table
+            dailyCompletedByTeam: {} as Record<Team, number>,
+            dailyBuildByTeam: {} as Record<Team, number>,
+            dailyRunByTeam: {} as Record<Team, number>,
         }
     });
 
@@ -167,6 +150,45 @@ export default function SprintDashboard() {
       burnDownData,
     }
 
+  }, [selectedSprint]);
+
+  const dailyProgressData = useMemo(() => {
+    if (!selectedSprint) return [];
+
+    const sprintDays: { date: string; day: number }[] = [];
+    let currentDate = new Date(selectedSprint.startDate);
+    const endDate = new Date(selectedSprint.endDate);
+    let dayCount = 1;
+
+    const getLocalDate = (date: Date) => new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
+
+    while (getLocalDate(currentDate) <= getLocalDate(endDate)) {
+        sprintDays.push({ date: currentDate.toISOString().split('T')[0], day: dayCount++ });
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    const dataByDate = new Map<string, Record<Team, number>>();
+    for (const ticket of selectedSprint.tickets) {
+        if (ticket.dailyLogs) {
+            for (const log of ticket.dailyLogs) {
+                if (!dataByDate.has(log.date)) {
+                    dataByDate.set(log.date, {} as Record<Team, number>);
+                }
+                const dayData = dataByDate.get(log.date)!;
+                dayData[ticket.scope] = (dayData[ticket.scope] || 0) + log.loggedHours;
+            }
+        }
+    }
+
+    return sprintDays.map(dayInfo => ({
+        day: dayInfo.day,
+        date: dayInfo.date,
+        loggedHours: teams.reduce((acc, team) => {
+            const dateData = dataByDate.get(dayInfo.date);
+            acc[team] = dateData?.[team] || 0;
+            return acc;
+        }, {} as Record<Team, number>)
+    }));
   }, [selectedSprint]);
 
   const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData'>) => {
@@ -285,7 +307,7 @@ export default function SprintDashboard() {
             status: data.status,
             dailyLogs: newDailyLogs,
             timeLogged: timeLogged,
-          };
+          } as Ticket;
 
           if (!wasDone && isDone) {
             updatedTicket.completionDate = new Date(data.date).toISOString();
@@ -445,7 +467,7 @@ export default function SprintDashboard() {
         </div>
       </div>
 
-       <TeamDailyProgress burnDownData={processedSprint.burnDownData} />
+       <TeamDailyProgress dailyProgress={dailyProgressData} />
 
        <Card>
           <CardHeader className="flex flex-row items-center justify-between">

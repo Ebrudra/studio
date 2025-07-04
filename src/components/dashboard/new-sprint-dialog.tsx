@@ -4,6 +4,7 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
 import { teams } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,6 +45,23 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       teamCapacity: teams.reduce((acc, team) => ({ ...acc, [team]: 0 }), {} as Record<Team, number>),
     },
   })
+  
+  const { watch, setValue } = form;
+  const startDate = watch("startDate");
+  const endDate = watch("endDate");
+
+  React.useEffect(() => {
+    if (startDate && endDate && endDate >= startDate) {
+      const interval = { start: startDate, end: endDate };
+      const weekDays = eachDayOfInterval(interval).filter(
+        (day) => !isSaturday(day) && !isSunday(day)
+      ).length;
+
+      teams.forEach((team) => {
+        setValue(`teamCapacity.${team}`, weekDays);
+      });
+    }
+  }, [startDate, endDate, setValue]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const totalDays = Object.values(values.teamCapacity).reduce((acc, days) => acc + days, 0)
