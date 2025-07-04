@@ -17,7 +17,7 @@ import { teams as allTeams } from "@/lib/data"
 export interface DailyProgressData {
   day: number;
   date: string;
-  progress: Record<Team, { build: number; run: number }>;
+  progress: Record<Team, { build: number; run: number; buffer: number }>;
 }
 
 interface TeamDailyProgressProps {
@@ -30,7 +30,7 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
     if (dailyProgress) {
         dailyProgress.forEach(day => {
             Object.keys(day.progress).forEach(team => {
-                if (day.progress[team as Team].build > 0 || day.progress[team as Team].run > 0) {
+                if (day.progress[team as Team].build > 0 || day.progress[team as Team].run > 0 || day.progress[team as Team].buffer > 0) {
                     teamSet.add(team as Team);
                 }
             });
@@ -58,7 +58,7 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
     grandTotalRun = Object.values(teamTotals).reduce((sum, totals) => sum + totals.run, 0);
     
     return { teamTotals, grandTotalBuild, grandTotalRun };
-  }, [dailyProgress]);
+  }, [dailyProgress, allTeams]);
 
   if (!dailyProgress || dailyProgress.length === 0 || activeTeams.length === 0) {
     return null;
@@ -102,22 +102,22 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
 
               return (
                  <TableRow key={day.day}>
-                    <TableCell className="font-medium sticky left-0 bg-background z-10">J{day.day}</TableCell>
+                    <TableCell className="font-medium sticky left-0 bg-background z-10">Day {day.day}</TableCell>
                     <TableCell>
                     {new Date(day.date).toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}
                     </TableCell>
                     {activeTeams.map(team => (
                          <React.Fragment key={team}>
                             <TableCell className="text-right border-l">
-                                {day.progress[team]?.build > 0 ? day.progress[team].build : ""}
+                                {day.progress[team]?.build > 0 ? day.progress[team].build.toFixed(1) : ""}
                             </TableCell>
                              <TableCell className="text-right">
-                                {day.progress[team]?.run > 0 ? day.progress[team].run : ""}
+                                {day.progress[team]?.run > 0 ? day.progress[team].run.toFixed(1) : ""}
                             </TableCell>
                         </React.Fragment>
                     ))}
-                    <TableCell className="text-right border-l font-bold">{dailyTotalBuild > 0 ? dailyTotalBuild : ""}</TableCell>
-                    <TableCell className="text-right font-bold">{dailyTotalRun > 0 ? dailyTotalRun : ""}</TableCell>
+                    <TableCell className="text-right border-l font-bold">{dailyTotalBuild > 0 ? dailyTotalBuild.toFixed(1) : ""}</TableCell>
+                    <TableCell className="text-right font-bold">{dailyTotalRun > 0 ? dailyTotalRun.toFixed(1) : ""}</TableCell>
                 </TableRow>
               )
             })}
@@ -128,15 +128,15 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
               {activeTeams.map(team => (
                 <React.Fragment key={team}>
                     <TableCell className="text-right border-l">
-                        {totals.teamTotals[team].build > 0 ? totals.teamTotals[team].build : ""}
+                        {totals.teamTotals[team].build > 0 ? totals.teamTotals[team].build.toFixed(1) : ""}
                     </TableCell>
                      <TableCell className="text-right">
-                        {totals.teamTotals[team].run > 0 ? totals.teamTotals[team].run : ""}
+                        {totals.teamTotals[team].run > 0 ? totals.teamTotals[team].run.toFixed(1) : ""}
                     </TableCell>
                 </React.Fragment>
               ))}
-              <TableCell className="text-right border-l">{totals.grandTotalBuild > 0 ? totals.grandTotalBuild : ""}</TableCell>
-              <TableCell className="text-right">{totals.grandTotalRun > 0 ? totals.grandTotalRun : ""}</TableCell>
+              <TableCell className="text-right border-l">{totals.grandTotalBuild > 0 ? totals.grandTotalBuild.toFixed(1) : ""}</TableCell>
+              <TableCell className="text-right">{totals.grandTotalRun > 0 ? totals.grandTotalRun.toFixed(1) : ""}</TableCell>
             </TableRow>
           </TableFooter>
         </Table>

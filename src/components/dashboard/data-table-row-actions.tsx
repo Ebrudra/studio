@@ -1,7 +1,7 @@
 "use client"
 
 import { Row } from "@tanstack/react-table"
-import { Clock, Pencil, Trash2 } from "lucide-react"
+import { Clock, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import type { Ticket } from "@/types"

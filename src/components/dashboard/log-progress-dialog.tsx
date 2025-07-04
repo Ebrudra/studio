@@ -48,7 +48,7 @@ const formSchema = z.object({
     }
     return true;
 }, {
-    message: "New Ticket ID and Title are required",
+    message: "New Ticket ID and Title are required when creating a new ticket.",
     path: ["newTicketTitle"],
 });
 
@@ -127,7 +127,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
    React.useEffect(() => {
     if (isNewTicket && !touchedFields.estimation) {
       if (selectedType === 'Bug' || selectedType === 'Buffer') {
-        setValue('estimation', Number(loggedHours) || 0, { shouldTouch: false })
+        setValue('estimation', Number(loggedHours) || 0, { shouldValidate: true })
       }
     }
   }, [isNewTicket, selectedType, loggedHours, setValue, touchedFields]);
@@ -295,7 +295,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Time Logged (h)</FormLabel>
-                            <FormControl><Input type="number" {...field} /></FormControl>
+                            <FormControl><Input type="number" step="0.5" {...field} /></FormControl>
                              <FormMessage />
                         </FormItem>
                     )}
@@ -309,7 +309,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Estimation (h)</FormLabel>
-                            <FormControl><Input type="number" {...field} disabled={!isNewTicket} /></FormControl>
+                            <FormControl><Input type="number" step="0.5" {...field} disabled={!isNewTicket} /></FormControl>
                              <FormMessage />
                         </FormItem>
                     )}

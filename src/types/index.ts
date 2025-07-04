@@ -17,7 +17,8 @@ export interface Ticket {
   estimation: number;
   timeLogged: number;
   status: TicketStatus;
-  completionDate?: string;
+  creationDate?: string; // YYYY-MM-DD
+  completionDate?: string; // YYYY-MM-DD
   dailyLogs?: DailyLog[];
   isOutOfScope?: boolean;
 }

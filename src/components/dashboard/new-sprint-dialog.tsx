@@ -4,7 +4,7 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
+import { eachDayOfInterval, isSaturday, isSunday, startOfWeek, endOfWeek, addDays, nextWednesday, previousTuesday } from "date-fns"
 import { teams } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "../ui/date-picker"
 import type { Sprint, Team } from "@/types"
+import { useToast } from "@/hooks/use-toast"
 
 interface NewSprintDialogProps {
   isOpen: boolean
@@ -46,9 +47,22 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     },
   })
   
-  const { watch, setValue } = form;
+  const { watch, setValue, trigger } = form;
   const startDate = watch("startDate");
   const endDate = watch("endDate");
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    // Set default sprint dates to start next Wednesday and end the Tuesday after next.
+    if(!startDate && !endDate) {
+        const today = new Date();
+        const nextWed = nextWednesday(today);
+        const followingTue = previousTuesday(addDays(nextWed, 14));
+        setValue("startDate", nextWed);
+        setValue("endDate", followingTue);
+    }
+  }, [startDate, endDate, setValue]);
+
 
   React.useEffect(() => {
     if (startDate && endDate && endDate >= startDate) {
@@ -58,10 +72,10 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       ).length;
 
       teams.forEach((team) => {
-        setValue(`teamCapacity.${team}`, weekDays);
+        setValue(`teamCapacity.${team}`, weekDays, { shouldValidate: true });
       });
     }
-  }, [startDate, endDate, setValue]);
+  }, [startDate, endDate, setValue, trigger]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     let totalBuildCapacity = 0;
@@ -73,14 +87,23 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
 
     teamsWithCapacity.forEach(team => {
         const personDays = values.teamCapacity[team as Team];
-        const teamBuildHours = personDays * 6; 
-        const teamRunHours = (personDays * 2) - 8; // 8h overhead per team's sprint contribution is deducted from run time
+        const teamBuildHours = personDays * 6;
+        const teamRunHours = (personDays * 2) - 8; 
 
         totalBuildCapacity += teamBuildHours > 0 ? teamBuildHours : 0;
         totalRunCapacity += teamRunHours > 0 ? teamRunHours : 0;
     });
 
     const totalCapacity = totalBuildCapacity + totalRunCapacity;
+    
+    if (totalRunCapacity < 0) {
+        toast({
+            variant: "destructive",
+            title: "Invalid Capacity",
+            description: "Total Run capacity cannot be negative. Please adjust team days."
+        });
+        return;
+    }
 
     onCreateSprint({
       name: values.name,
@@ -101,7 +124,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
         <DialogHeader>
           <DialogTitle>Start a New Sprint</DialogTitle>
           <DialogDescription>
-            Enter the details for the new sprint and define team capacity.
+            Enter the details for the new sprint and define team capacity. Weekends are automatically excluded from day counts.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -144,7 +167,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
               />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-medium">Team Capacity (in days)</h3>
+              <h3 className="mb-2 text-sm font-medium">Team Capacity (Working Days)</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {teams.map(team => (
                   <FormField

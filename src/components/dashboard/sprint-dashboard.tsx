@@ -5,12 +5,14 @@ import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
 import type { Sprint, Ticket, DailySprintData, Team, DailyLog, TicketStatus, TicketTypeScope } from '@/types';
+import { eachDayOfInterval, isSaturday, isSunday } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TaskTable } from './task-table';
 import { BurnDownChart } from './burn-down-chart';
 import { ScopeDistributionChart } from './scope-distribution-chart';
+import { WorkDistributionChart } from './work-distribution-chart';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
@@ -86,21 +88,15 @@ export default function SprintDashboard() {
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    const tickets = selectedSprint.tickets.map(ticket => {
-        const isOutOfScopeStory = ticket.isOutOfScope && ticket.type === 'User story';
-        const isBug = ticket.type === 'Bug';
-        const isBuffer = ticket.type === 'Buffer';
-        
-        // Don't include out-of-scope stories, bugs, or buffers in BDC calculations
-        const bdcScope = !(isOutOfScopeStory || isBug || isBuffer);
-        
-        return { ...ticket, bdcScope };
-    });
+    // Ensure bug estimations are always equal to their logged time
+    const tickets = selectedSprint.tickets.map(ticket => 
+        ticket.type === 'Bug' ? { ...ticket, estimation: ticket.timeLogged } : ticket
+    );
 
-    const bdcTickets = tickets.filter(t => t.bdcScope);
+    const bdcTickets = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
     const totalScope = bdcTickets.reduce((acc, ticket) => acc + ticket.estimation, 0);
 
-    const completedWork = bdcTickets
+    const completedWork = tickets
       .filter((ticket) => ticket.status === 'Done')
       .reduce((acc, ticket) => acc + ticket.estimation, 0);
 
@@ -111,24 +107,45 @@ export default function SprintDashboard() {
     const startDate = new Date(selectedSprint.startDate);
     const endDate = new Date(selectedSprint.endDate);
     const sprintDays: { date: string, day: number }[] = [];
-    let currentDate = new Date(startDate);
-    let dayCount = 1;
-
-    const getLocalDate = (date: Date) => new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
-
-    while (getLocalDate(currentDate) <= getLocalDate(endDate)) {
-        sprintDays.push({ date: currentDate.toISOString().split('T')[0], day: dayCount++ });
-        currentDate.setDate(currentDate.getDate() + 1);
+    if (startDate && endDate && endDate >= startDate) {
+        const interval = { start: startDate, end: endDate };
+        const workingDays = eachDayOfInterval(interval).filter(
+            day => !isSaturday(day) && !isSunday(day)
+        );
+        workingDays.forEach((date, index) => {
+            sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
+        });
     }
     
-    const burnDownData: DailySprintData[] = sprintDays.map((day) => ({
-        day: day.day,
-        date: day.date,
-        ideal: 0, actual: 0, completed: 0,
+    const idealBurnPerDay = totalScope / (sprintDays.length > 1 ? sprintDays.length - 1 : 1);
+    
+    let cumulativeScope = 0;
+    const scopeByDay = new Map<string, number>();
+    sprintDays.forEach(day => {
+        const newScopeToday = bdcTickets.filter(t => t.creationDate === day.date).reduce((acc, t) => acc + t.estimation, 0);
+        cumulativeScope += newScopeToday;
+        scopeByDay.set(day.date, cumulativeScope);
+    });
+    
+    let remainingScope = totalScope;
+    const burnDownData: DailySprintData[] = sprintDays.map((dayData, index) => {
+      const completedToday = bdcTickets
+        .filter(t => t.completionDate === dayData.date)
+        .reduce((acc, t) => acc + t.estimation, 0);
+
+      remainingScope -= completedToday;
+      
+      return {
+        day: dayData.day,
+        date: dayData.date,
+        ideal: parseFloat((totalScope - (index * idealBurnPerDay)).toFixed(2)),
+        actual: remainingScope < 0 ? 0 : remainingScope,
+        completed: 0,
         dailyCompletedByTeam: {} as Record<Team, number>,
         dailyBuildByTeam: {} as Record<Team, number>,
         dailyRunByTeam: {} as Record<Team, number>,
-    }));
+      }
+    });
 
     return { ...selectedSprint, summaryMetrics, burnDownData, tickets };
   }, [selectedSprint]);
@@ -137,28 +154,33 @@ export default function SprintDashboard() {
     if (!selectedSprint) return [];
 
     const sprintDays: { date: string; day: number }[] = [];
-    let currentDate = new Date(selectedSprint.startDate);
+    const startDate = new Date(selectedSprint.startDate);
     const endDate = new Date(selectedSprint.endDate);
-    let dayCount = 1;
-    const getLocalDate = (date: Date) => new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
-    while (getLocalDate(currentDate) <= getLocalDate(endDate)) {
-        sprintDays.push({ date: currentDate.toISOString().split('T')[0], day: dayCount++ });
-        currentDate.setDate(currentDate.getDate() + 1);
+    if (startDate && endDate && endDate >= startDate) {
+        const interval = { start: startDate, end: endDate };
+        const workingDays = eachDayOfInterval(interval).filter(
+            day => !isSaturday(day) && !isSunday(day)
+        );
+        workingDays.forEach((date, index) => {
+            sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
+        });
     }
     
-    const dataByDate = new Map<string, Record<Team, { build: number; run: number }>>();
+    const dataByDate = new Map<string, Record<Team, { build: number; run: number; buffer: number }>>();
     
     for (const ticket of selectedSprint.tickets) {
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
                 if (!dataByDate.has(log.date)) {
-                    dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0}}), {} as Record<Team, { build: number; run: number }>));
+                    dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: number }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
                 if (ticket.typeScope === 'Build') {
                     dayData[ticket.scope].build += log.loggedHours;
                 } else if (ticket.typeScope === 'Run') {
                      dayData[ticket.scope].run += log.loggedHours;
+                } else if (ticket.typeScope === 'Sprint') {
+                     dayData[ticket.scope].buffer += log.loggedHours;
                 }
             }
         }
@@ -167,7 +189,7 @@ export default function SprintDashboard() {
     return sprintDays.map(dayInfo => ({
         day: dayInfo.day,
         date: dayInfo.date,
-        progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0}}), {} as Record<Team, { build: number; run: number }>)
+        progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number; buffer: 0 }>)
     }));
   }, [selectedSprint]);
 
@@ -180,17 +202,17 @@ export default function SprintDashboard() {
     if (processedSprint.summaryMetrics.totalScope > (processedSprint.totalCapacity || 0)) {
         warnings.push({
             title: "Scope Creep Alert",
-            description: `Total planned scope (${processedSprint.summaryMetrics.totalScope}h) exceeds the sprint's capacity (${processedSprint.totalCapacity}h).`
+            description: `Total scope (${processedSprint.summaryMetrics.totalScope}h) exceeds the sprint's capacity (${processedSprint.totalCapacity}h).`
         });
     }
 
     // 2. Bug Infestation
     const runEffort = processedSprint.tickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
     const runCapacity = processedSprint.runCapacity || 0;
-    if (runCapacity > 0 && runEffort / (processedSprint.totalCapacity || 1) > 0.2) {
+    if (runCapacity > 0 && runEffort > (processedSprint.totalCapacity || 1) * 0.2) {
          warnings.push({
             title: "Bug Infestation Trend",
-            description: `Total time logged on 'Run' activities (${runEffort}h) is over 20% of total capacity.`
+            description: `Total time logged on 'Run' activities (${runEffort.toFixed(1)}h) is over 20% of total capacity.`
         });
     }
 
@@ -207,13 +229,18 @@ export default function SprintDashboard() {
   }, [processedSprint]);
 
   const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo?: { title: string, description: string }) => {
-    setPreviousSprints(sprints);
     setSprints(currentSprints => {
       const newSprints = updateFn(currentSprints);
-      // Since `setSprints` is async, we can't reliably show the toast here based on the result.
-      // The toast call is moved to the handler functions.
+      if (toastInfo) {
+          toast(toastInfo);
+      }
       return newSprints;
     });
+  }
+  
+  const handleBulkUpdate = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo: { title: string, description: string }) => {
+    setPreviousSprints(sprints);
+    updateSprints(updateFn, toastInfo);
   }
 
   const handleRollback = () => {
@@ -237,7 +264,7 @@ export default function SprintDashboard() {
   };
 
   const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
-    const newTask: Ticket = { ...newTaskData, timeLogged: 0, dailyLogs: [] };
+    const newTask: Ticket = { ...newTaskData, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
     updateSprints(prevSprints =>
       prevSprints.map(sprint =>
         sprint.id === selectedSprintId
@@ -271,7 +298,7 @@ export default function SprintDashboard() {
                 lastUpdatedAt: new Date().toISOString(),
               }
             : sprint
-        )
+        ), { title: "Task Deleted", description: `Task ${taskId} has been removed.` }
       );
     }
   };
@@ -307,9 +334,10 @@ export default function SprintDashboard() {
             status: data.status,
             dailyLogs: [newLog],
             timeLogged: newLog.loggedHours,
+            creationDate: new Date(data.date).toISOString().split('T')[0],
           };
           if (newTicket.status === 'Done') {
-            newTicket.completionDate = new Date(data.date).toISOString();
+            newTicket.completionDate = new Date(data.date).toISOString().split('T')[0];
           }
           newTickets.push(newTicket);
         } else if (ticket) {
@@ -329,7 +357,7 @@ export default function SprintDashboard() {
           let updatedTicket: Ticket = { ...ticket, status: data.status, dailyLogs: newDailyLogs, timeLogged };
 
           if (!wasDone && isDone) {
-            updatedTicket.completionDate = new Date(data.date).toISOString();
+            updatedTicket.completionDate = new Date(data.date).toISOString().split('T')[0];
           } else if (wasDone && !isDone) {
             delete updatedTicket.completionDate;
           }
@@ -344,7 +372,7 @@ export default function SprintDashboard() {
   
   const handleBulkUploadTasks = (tasks: BulkTask[]) => {
     let addedCount = 0;
-    updateSprints(prevSprints => {
+    handleBulkUpdate(prevSprints => {
       const sprintToUpdate = prevSprints.find(s => s.id === selectedSprintId);
       if (!sprintToUpdate) return prevSprints;
 
@@ -363,6 +391,7 @@ export default function SprintDashboard() {
           timeLogged: 0,
           dailyLogs: [],
           status: 'To Do',
+          creationDate: new Date().toISOString().split('T')[0],
         };
       });
 
@@ -370,10 +399,7 @@ export default function SprintDashboard() {
         return prevSprints.map(s => s.id === selectedSprintId ? { ...s, tickets: [...s.tickets, ...newTickets], lastUpdatedAt: new Date().toISOString() } : s);
       }
       return prevSprints;
-    });
-
-    const skippedCount = tasks.length - addedCount;
-    toast({ title: "Task Upload Complete", description: `${addedCount} tasks added. ${skippedCount} duplicates skipped.` });
+    }, { title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
   };
 
   const handleBulkLogProgress = (logs: BulkProgressLog[]) => {
@@ -382,7 +408,7 @@ export default function SprintDashboard() {
 
     logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    updateSprints(prevSprints => {
+    handleBulkUpdate(prevSprints => {
         return prevSprints.map(sprint => {
             if (sprint.id !== selectedSprintId) return sprint;
 
@@ -393,7 +419,7 @@ export default function SprintDashboard() {
                 
                 let ticket = ticketsMap.get(log.ticketId);
 
-                if (!ticket) { // Create new ticket if it doesn't exist
+                if (!ticket) {
                     if (!log.title || !log.scope || !log.type) continue;
                     
                     let typeScope: TicketTypeScope = log.typeScope || 'Build';
@@ -412,7 +438,8 @@ export default function SprintDashboard() {
                         status: log.status,
                         timeLogged: 0,
                         dailyLogs: [],
-                        isOutOfScope: log.type === 'User story'
+                        isOutOfScope: log.type === 'User story',
+                        creationDate: new Date(log.date).toISOString().split('T')[0],
                     };
                     newTicketsCount++;
                 }
@@ -425,13 +452,15 @@ export default function SprintDashboard() {
                 } else {
                     ticket.dailyLogs.push(newLog);
                 }
+                
+                ticket.dailyLogs.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                ticket.status = log.status;
+                ticket.status = log.status; // status is based on latest log for that ticket
                 ticket.timeLogged = ticket.dailyLogs.reduce((acc, l) => acc + l.loggedHours, 0);
 
                 const wasDone = !!ticket.completionDate;
                 const isDone = log.status === 'Done';
-                if (!wasDone && isDone) ticket.completionDate = new Date(log.date).toISOString();
+                if (!wasDone && isDone) ticket.completionDate = new Date(log.date).toISOString().split('T')[0];
                 else if (wasDone && !isDone) delete ticket.completionDate;
                 
                 ticketsMap.set(log.ticketId, ticket);
@@ -440,9 +469,7 @@ export default function SprintDashboard() {
 
             return { ...sprint, tickets: Array.from(ticketsMap.values()), lastUpdatedAt: new Date().toISOString() };
         });
-    });
-
-    toast({
+    }, {
         title: "Progress Log Upload Complete",
         description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
     });
@@ -523,7 +550,7 @@ export default function SprintDashboard() {
             <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope}h</div>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope.toFixed(1)}h</div>
             <p className="text-xs text-muted-foreground">Of {processedSprint.totalCapacity}h capacity</p>
           </CardContent>
         </Card>
@@ -533,8 +560,8 @@ export default function SprintDashboard() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.completedWork}h</div>
-            <p className="text-xs text-muted-foreground">Of {processedSprint.summaryMetrics.totalScope}h total</p>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.completedWork.toFixed(1)}h</div>
+            <p className="text-xs text-muted-foreground">Of {processedSprint.summaryMetrics.totalScope.toFixed(1)}h total</p>
           </CardContent>
         </Card>
         <Card>
@@ -543,7 +570,7 @@ export default function SprintDashboard() {
             <ListTodo className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork}h</div>
+            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
             <p className="text-xs text-muted-foreground">To be completed</p>
           </CardContent>
         </Card>
@@ -584,8 +611,12 @@ export default function SprintDashboard() {
         </div>
         <div className="lg:col-span-2 space-y-6">
             <Card>
-                <CardHeader><CardTitle>Scope Distribution</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Scope Distribution (by Estimation)</CardTitle></CardHeader>
                 <CardContent><ScopeDistributionChart tickets={processedSprint.tickets} /></CardContent>
+            </Card>
+             <Card>
+                <CardHeader><CardTitle>Work Distribution (by Logged Hours)</CardTitle></CardHeader>
+                <CardContent><WorkDistributionChart tickets={processedSprint.tickets} /></CardContent>
             </Card>
         </div>
       </div>
