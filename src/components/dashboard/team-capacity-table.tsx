@@ -39,7 +39,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
       const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
       
       const totalPlanned = plannedBuild + plannedRun
-      const totalDelivered = deliveredBuild + totalRun
+      const totalDelivered = deliveredBuild + deliveredRun
 
       return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
     })
@@ -167,5 +167,3 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
     </Card>
   )
 }
-
-    
