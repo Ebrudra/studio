@@ -698,7 +698,7 @@ export default function SprintDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={onDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
           </CardContent>
        </Card>
 
