@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -40,25 +41,28 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
   }, [dailyProgress]);
 
   const totals = React.useMemo(() => {
-    const teamTotals: Record<Team, { build: number; run: number }> = allTeams.reduce((acc, team) => ({ ...acc, [team]: { build: 0, run: 0 } }), {} as Record<Team, { build: 0, run: 0 }>);
+    const teamTotals: Record<Team, { build: number; run: number; buffer: number }> = allTeams.reduce((acc, team) => ({ ...acc, [team]: { build: 0, run: 0, buffer: 0 } }), {} as Record<Team, { build: 0, run: 0, buffer: 0 }>);
     let grandTotalBuild = 0;
     let grandTotalRun = 0;
+    let grandTotalBuffer = 0;
 
     if (dailyProgress) {
         dailyProgress.forEach(day => {
             allTeams.forEach(team => {
-                const { build, run } = day.progress[team] || { build: 0, run: 0 };
+                const { build, run, buffer } = day.progress[team] || { build: 0, run: 0, buffer: 0 };
                 teamTotals[team].build += build;
                 teamTotals[team].run += run;
+                teamTotals[team].buffer += buffer;
             });
         });
     }
     
     grandTotalBuild = Object.values(teamTotals).reduce((sum, totals) => sum + totals.build, 0);
     grandTotalRun = Object.values(teamTotals).reduce((sum, totals) => sum + totals.run, 0);
-    
-    return { teamTotals, grandTotalBuild, grandTotalRun };
-  }, [dailyProgress, allTeams]);
+    grandTotalBuffer = Object.values(teamTotals).reduce((sum, totals) => sum + totals.buffer, 0);
+
+    return { teamTotals, grandTotalBuild, grandTotalRun, grandTotalBuffer };
+  }, [dailyProgress]);
 
   if (!dailyProgress || dailyProgress.length === 0 || activeTeams.length === 0) {
     return null;
@@ -67,7 +71,7 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Team Daily Progress (Build/Run Hours)</CardTitle>
+        <CardTitle>Team Daily Progress (Build/Run/Buffer Hours)</CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <Table>
@@ -75,9 +79,9 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
             <TableRow>
               <TableHead className="min-w-[50px] sticky left-0 bg-background z-10">Day</TableHead>
               {activeTeams.map(team => (
-                <TableHead key={team} colSpan={2} className="text-center min-w-[150px] border-l">{team}</TableHead>
+                <TableHead key={team} colSpan={3} className="text-center min-w-[225px] border-l">{team}</TableHead>
               ))}
-               <TableHead colSpan={2} className="text-center font-bold min-w-[150px] border-l">Daily Totals</TableHead>
+               <TableHead colSpan={3} className="text-center font-bold min-w-[225px] border-l">Daily Totals</TableHead>
             </TableRow>
              <TableRow className="text-xs text-muted-foreground">
                 <TableHead className="sticky left-0 bg-background z-10"></TableHead>
@@ -85,18 +89,21 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
                     <React.Fragment key={team}>
                         <TableHead className="text-right border-l">Build</TableHead>
                         <TableHead className="text-right">Run</TableHead>
+                        <TableHead className="text-right">Buffer</TableHead>
                     </React.Fragment>
                 ))}
                 <TableHead className="text-right border-l font-bold">Build</TableHead>
                 <TableHead className="text-right font-bold">Run</TableHead>
+                <TableHead className="text-right font-bold">Buffer</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {dailyProgress.map(day => {
                 const dailyTotalBuild = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.build || 0), 0);
                 const dailyTotalRun = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.run || 0), 0);
+                const dailyTotalBuffer = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.buffer || 0), 0);
               
-                if (dailyTotalBuild + dailyTotalRun === 0) return null;
+                if (dailyTotalBuild + dailyTotalRun + dailyTotalBuffer === 0) return null;
 
               return (
                  <TableRow key={day.day}>
@@ -109,10 +116,14 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
                              <TableCell className="text-right">
                                 {day.progress[team]?.run > 0 ? day.progress[team].run.toFixed(1) : ""}
                             </TableCell>
+                             <TableCell className="text-right">
+                                {day.progress[team]?.buffer > 0 ? day.progress[team].buffer.toFixed(1) : ""}
+                            </TableCell>
                         </React.Fragment>
                     ))}
                     <TableCell className="text-right border-l font-bold">{dailyTotalBuild > 0 ? dailyTotalBuild.toFixed(1) : ""}</TableCell>
                     <TableCell className="text-right font-bold">{dailyTotalRun > 0 ? dailyTotalRun.toFixed(1) : ""}</TableCell>
+                    <TableCell className="text-right font-bold">{dailyTotalBuffer > 0 ? dailyTotalBuffer.toFixed(1) : ""}</TableCell>
                 </TableRow>
               )
             })}
@@ -128,10 +139,14 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
                      <TableCell className="text-right">
                         {totals.teamTotals[team].run > 0 ? totals.teamTotals[team].run.toFixed(1) : ""}
                     </TableCell>
+                    <TableCell className="text-right">
+                        {totals.teamTotals[team].buffer > 0 ? totals.teamTotals[team].buffer.toFixed(1) : ""}
+                    </TableCell>
                 </React.Fragment>
               ))}
               <TableCell className="text-right border-l">{totals.grandTotalBuild > 0 ? totals.grandTotalBuild.toFixed(1) : ""}</TableCell>
               <TableCell className="text-right">{totals.grandTotalRun > 0 ? totals.grandTotalRun.toFixed(1) : ""}</TableCell>
+              <TableCell className="text-right">{totals.grandTotalBuffer > 0 ? totals.grandTotalBuffer.toFixed(1) : ""}</TableCell>
             </TableRow>
           </TableFooter>
         </Table>

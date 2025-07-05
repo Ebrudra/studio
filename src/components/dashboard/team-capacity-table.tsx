@@ -37,11 +37,12 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
       
       const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
       const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
+      const deliveredBuffer = teamTickets.filter(t => t.typeScope === 'Sprint').reduce((acc, t) => acc + t.timeLogged, 0);
       
       const totalPlanned = plannedBuild + plannedRun
       const totalDelivered = deliveredBuild + deliveredRun
 
-      return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
+      return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, deliveredBuffer, totalPlanned, totalDelivered }
     })
   }, [sprint])
 
@@ -51,10 +52,11 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
         acc.deliveredBuild += data.deliveredBuild
         acc.plannedRun += data.plannedRun
         acc.deliveredRun += data.deliveredRun
+        acc.deliveredBuffer += data.deliveredBuffer
         acc.totalPlanned += data.totalPlanned
         acc.totalDelivered += data.totalDelivered
         return acc
-    }, { plannedBuild: 0, deliveredBuild: 0, plannedRun: 0, deliveredRun: 0, totalPlanned: 0, totalDelivered: 0 })
+    }, { plannedBuild: 0, deliveredBuild: 0, plannedRun: 0, deliveredRun: 0, deliveredBuffer: 0, totalPlanned: 0, totalDelivered: 0 })
   }, [capacityData])
   
   const handleInputChange = (team: Team, type: 'build' | 'run', value: string) => {
@@ -123,6 +125,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
               <TableHead>Team</TableHead>
               <TableHead>Build (Done/Plan)</TableHead>
               <TableHead>Run (Done/Plan)</TableHead>
+              <TableHead>Buffer (Delivered)</TableHead>
               <TableHead>Total (Done/Plan)</TableHead>
             </TableRow>
           </TableHeader>
@@ -132,6 +135,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
                 <TableCell className="font-medium">{data.team}</TableCell>
                 <TableCell>{renderCell(data, 'build')}</TableCell>
                 <TableCell>{renderCell(data, 'run')}</TableCell>
+                <TableCell>{data.deliveredBuffer.toFixed(1)}h</TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
                         <span>{`${data.totalDelivered.toFixed(1)}h / ${data.totalPlanned.toFixed(1)}h`}</span>
@@ -154,6 +158,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
                         <Progress value={totals.plannedRun > 0 ? (totals.deliveredRun / totals.plannedRun) * 100 : 0} className="w-20" />
                     </div>
                 </TableCell>
+                <TableCell>{totals.deliveredBuffer.toFixed(1)}h</TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
                         <span>{`${totals.totalDelivered.toFixed(1)}h / ${totals.totalPlanned.toFixed(1)}h`}</span>

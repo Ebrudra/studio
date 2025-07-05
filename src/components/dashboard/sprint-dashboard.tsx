@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
+import { EditSprintDialog } from './edit-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
 import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
 import { Skeleton } from '../ui/skeleton';
@@ -43,6 +44,7 @@ export default function SprintDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
+  const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
@@ -270,6 +272,15 @@ export default function SprintDashboard() {
     };
     updateSprints(prevSprints => [...prevSprints, newSprint]);
     setSelectedSprintId(newSprint.id);
+  };
+  
+  const handleUpdateSprint = (updatedSprintData: Sprint) => {
+    updateSprints(prevSprints =>
+        prevSprints.map(sprint =>
+            sprint.id === updatedSprintData.id ? updatedSprintData : sprint
+        )
+    );
+    toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
   };
 
   const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
@@ -601,6 +612,7 @@ export default function SprintDashboard() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
+       {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={handleUpdateSprint} />}
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} onSaveReport={handleSaveReport} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
@@ -631,6 +643,9 @@ export default function SprintDashboard() {
                     <Button variant="outline" size="icon"><Settings className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setIsEditSprintOpen(true)} disabled={!selectedSprint}>
+                        <Settings className="mr-2 h-4 w-4" /> Edit Sprint Details
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleCompleteSprint} disabled={isSprintCompleted}>
                         <Check className="mr-2 h-4 w-4" /> Complete Sprint
                     </DropdownMenuItem>
@@ -764,10 +779,9 @@ export default function SprintDashboard() {
       </div>
       
        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-5 space-y-6">
              <TeamCapacityTable sprint={processedSprint} onUpdateTeamCapacity={handleUpdateTeamCapacity} isSprintCompleted={isSprintCompleted} />
         </div>
-         <div className="lg:col-span-2 space-y-6"></div>
       </div>
 
        <TeamDailyProgress dailyProgress={dailyProgressData} />

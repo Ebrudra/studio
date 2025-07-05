@@ -1,0 +1,219 @@
+
+"use client"
+
+import * as React from "react"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
+import { teams } from "@/lib/data"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { DatePicker } from "../ui/date-picker"
+import type { Sprint, Team, TeamCapacity } from "@/types"
+import { useToast } from "@/hooks/use-toast"
+
+interface EditSprintDialogProps {
+  isOpen: boolean
+  setIsOpen: (isOpen: boolean) => void
+  sprint: Sprint;
+  onUpdateSprint: (sprint: Sprint) => void
+}
+
+const formSchema = z.object({
+  name: z.string().min(1, "Sprint name is required"),
+  startDate: z.date({ required_error: "Start date is required" }),
+  endDate: z.date({ required_error: "End date is required" }),
+  teamPersonDays: z.record(z.coerce.number().min(0, "Days must be non-negative").default(0)),
+}).refine(data => data.endDate > data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"],
+});
+
+
+export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: EditSprintDialogProps) {
+  
+  const defaultPersonDays = React.useMemo(() => {
+    const personDays: Record<string, number> = {};
+    if (sprint.teamCapacity) {
+        for (const team of teams) {
+            // Base person-days on build capacity as it doesn't have overhead deducted.
+            const buildCapacity = sprint.teamCapacity[team]?.plannedBuild || 0;
+            personDays[team] = buildCapacity / 6;
+        }
+    }
+    return personDays;
+  }, [sprint.teamCapacity]);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: sprint.name,
+      startDate: new Date(sprint.startDate),
+      endDate: new Date(sprint.endDate),
+      teamPersonDays: defaultPersonDays,
+    },
+  });
+  
+  const { watch, setValue, trigger, reset } = form;
+  const startDate = watch("startDate");
+  const endDate = watch("endDate");
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (sprint) {
+      reset({
+        name: sprint.name,
+        startDate: new Date(sprint.startDate),
+        endDate: new Date(sprint.endDate),
+        teamPersonDays: defaultPersonDays,
+      });
+    }
+  }, [sprint, reset, defaultPersonDays]);
+
+  React.useEffect(() => {
+    if (startDate && endDate && endDate >= startDate) {
+      const interval = { start: startDate, end: endDate };
+      const weekDays = eachDayOfInterval(interval).filter(
+        (day) => !isSaturday(day) && !isSunday(day)
+      ).length;
+
+      teams.forEach((team) => {
+        // Only update if it hasn't been manually set from the default
+        if (form.getValues(`teamPersonDays.${team}`) === (sprint.teamCapacity?.[team]?.plannedBuild || 0) / 6) {
+          setValue(`teamPersonDays.${team}`, weekDays, { shouldValidate: true });
+        }
+      });
+    }
+  }, [startDate, endDate, setValue, trigger, sprint, form]);
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const teamCapacity: Record<Team, TeamCapacity> = {} as Record<Team, TeamCapacity>;
+    let hasInvalidCapacity = false;
+
+    teams.forEach(team => {
+      const personDays = values.teamPersonDays[team as Team];
+      const plannedBuild = personDays * 6;
+      const plannedRun = (personDays * 2) - 8; // 8h overhead from run hours
+
+      if (plannedRun < 0) {
+        toast({
+            variant: "destructive",
+            title: `Invalid Capacity for ${team}`,
+            description: `Run capacity for ${team} is negative (${plannedRun}h). Please adjust person-days.`
+        });
+        hasInvalidCapacity = true;
+      }
+
+      teamCapacity[team as Team] = { plannedBuild, plannedRun };
+    });
+    
+    if (hasInvalidCapacity) {
+        return;
+    }
+    
+    const totalBuild = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedBuild, 0);
+    const totalRun = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedRun, 0);
+
+    onUpdateSprint({
+      ...sprint,
+      name: values.name,
+      startDate: values.startDate.toISOString(),
+      endDate: values.endDate.toISOString(),
+      teamCapacity: teamCapacity,
+      totalCapacity: totalBuild + totalRun,
+      buildCapacity: totalBuild,
+      runCapacity: totalRun,
+      lastUpdatedAt: new Date().toISOString(),
+    });
+    setIsOpen(false);
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Edit Sprint Details</DialogTitle>
+          <DialogDescription>
+            Update the details for "{sprint.name}". Weekends are automatically excluded from day counts.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sprint Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Q3 Sprint 3" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Start Date</FormLabel>
+                     <DatePicker date={field.value} setDate={field.onChange} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>End Date</FormLabel>
+                    <DatePicker date={field.value} setDate={field.onChange} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Team Person-Days</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {teams.map(team => (
+                  <FormField
+                    key={team}
+                    control={form.control}
+                    name={`teamPersonDays.${team}`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{team}</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <Button type="submit">Update Sprint</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}
