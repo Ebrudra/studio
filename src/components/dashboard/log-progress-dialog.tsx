@@ -5,6 +5,7 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -70,24 +71,26 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   const isNewTicket = selectedTicketId === 'new-ticket'
 
   const sprintDays = React.useMemo(() => {
-    if (!sprint.startDate || !sprint.endDate) return []
-    const days = []
-    let currentDate = new Date(sprint.startDate)
-    const endDate = new Date(sprint.endDate)
-    let dayCount = 1
-     const getLocalDate = (date: Date) => new Date(date.valueOf() + date.getTimezoneOffset() * 60 * 1000);
+    if (!sprint.startDate || !sprint.endDate) return [];
+    
+    const startDate = new Date(sprint.startDate);
+    const endDate = new Date(sprint.endDate);
 
-    while (getLocalDate(currentDate) <= getLocalDate(endDate)) {
-      const dateString = currentDate.toISOString().split('T')[0]
-      days.push({
-        value: dateString,
-        label: `Day ${dayCount} (${new Date(dateString).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})`,
-      })
-      currentDate.setDate(currentDate.getDate() + 1)
-      dayCount++
-    }
-    return days
-  }, [sprint.startDate, sprint.endDate])
+    if (startDate > endDate) return [];
+
+    const interval = { start: startDate, end: endDate };
+    const workingDays = eachDayOfInterval(interval).filter(
+      day => !isSaturday(day) && !isSunday(day)
+    );
+
+    return workingDays.map((date, index) => {
+        const dateString = date.toISOString().split('T')[0];
+        return {
+            value: dateString,
+            label: `Day ${index + 1} (${new Date(dateString).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})`,
+        }
+    });
+  }, [sprint.startDate, sprint.endDate]);
 
   const filteredTickets = React.useMemo(() => {
     if (!selectedScope) return []
@@ -344,3 +347,5 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
     </Dialog>
   )
 }
+
+    
