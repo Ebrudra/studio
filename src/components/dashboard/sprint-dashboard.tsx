@@ -16,7 +16,14 @@ import { WorkDistributionChart } from './work-distribution-chart';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen, Upload, AlertCircle, History } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
@@ -90,7 +97,7 @@ export default function SprintDashboard() {
 
     // Ensure bug estimations are always equal to their logged time
     const tickets = selectedSprint.tickets.map(ticket => 
-        ticket.type === 'Bug' ? { ...ticket, estimation: ticket.timeLogged } : ticket
+        (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
 
     const bdcTickets = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
@@ -175,12 +182,14 @@ export default function SprintDashboard() {
                     dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: number }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
-                if (ticket.typeScope === 'Build') {
-                    dayData[ticket.scope].build += log.loggedHours;
-                } else if (ticket.typeScope === 'Run') {
-                     dayData[ticket.scope].run += log.loggedHours;
-                } else if (ticket.typeScope === 'Sprint') {
-                     dayData[ticket.scope].buffer += log.loggedHours;
+                if(dayData[ticket.scope]) {
+                    if (ticket.typeScope === 'Build') {
+                        dayData[ticket.scope].build += log.loggedHours;
+                    } else if (ticket.typeScope === 'Run') {
+                        dayData[ticket.scope].run += log.loggedHours;
+                    } else if (ticket.typeScope === 'Sprint') {
+                        dayData[ticket.scope].buffer += log.loggedHours;
+                    }
                 }
             }
         }
@@ -198,25 +207,22 @@ export default function SprintDashboard() {
     const warnings = [];
     const today = new Date().toISOString().split('T')[0];
     
-    // 1. Scope Creep
     if (processedSprint.summaryMetrics.totalScope > (processedSprint.totalCapacity || 0)) {
         warnings.push({
             title: "Scope Creep Alert",
-            description: `Total scope (${processedSprint.summaryMetrics.totalScope}h) exceeds the sprint's capacity (${processedSprint.totalCapacity}h).`
+            description: `Total scope (${processedSprint.summaryMetrics.totalScope.toFixed(1)}h) exceeds the sprint's capacity (${(processedSprint.totalCapacity || 0).toFixed(1)}h).`
         });
     }
 
-    // 2. Bug Infestation
     const runEffort = processedSprint.tickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
     const runCapacity = processedSprint.runCapacity || 0;
-    if (runCapacity > 0 && runEffort > (processedSprint.totalCapacity || 1) * 0.2) {
+    if (runCapacity > 0 && runEffort > runCapacity) {
          warnings.push({
-            title: "Bug Infestation Trend",
-            description: `Total time logged on 'Run' activities (${runEffort.toFixed(1)}h) is over 20% of total capacity.`
+            title: "Run Capacity Exceeded",
+            description: `Total time logged on 'Run' activities (${runEffort.toFixed(1)}h) has exceeded the planned 'Run' capacity (${runCapacity.toFixed(1)}h).`
         });
     }
 
-    // 3. Behind Schedule
     const dayDataForToday = processedSprint.burnDownData.find(d => d.date === today);
     if(dayDataForToday && dayDataForToday.actual > dayDataForToday.ideal) {
         warnings.push({
@@ -227,17 +233,17 @@ export default function SprintDashboard() {
 
     return warnings;
   }, [processedSprint]);
-
+  
   const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo?: { title: string, description: string }) => {
     setSprints(currentSprints => {
-      const newSprints = updateFn(currentSprints);
-      if (toastInfo) {
-          toast(toastInfo);
-      }
-      return newSprints;
+        const newSprints = updateFn(currentSprints);
+        if (toastInfo) {
+            toast(toastInfo);
+        }
+        return newSprints;
     });
-  }
-  
+  };
+
   const handleBulkUpdate = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo: { title: string, description: string }) => {
     setPreviousSprints(sprints);
     updateSprints(updateFn, toastInfo);
@@ -251,7 +257,7 @@ export default function SprintDashboard() {
     }
   }
 
-  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData'>) => {
+  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData' | 'generatedReport'>) => {
     const newSprint: Sprint = {
       ...newSprintData,
       id: `sprint-${sprints.length + 1}-${Date.now()}`,
@@ -285,10 +291,6 @@ export default function SprintDashboard() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    const task = processedSprint?.tickets.find(t => t.id === taskId);
-    if (!task) return;
-    
-    if (window.confirm(`Are you sure you want to delete task: ${task.id}?`)) {
       updateSprints(prevSprints =>
         prevSprints.map(sprint =>
           sprint.id === selectedSprintId
@@ -300,7 +302,6 @@ export default function SprintDashboard() {
             : sprint
         ), { title: "Task Deleted", description: `Task ${taskId} has been removed.` }
       );
-    }
   };
   
   const handleLogRowAction = (task: Ticket) => {
@@ -474,6 +475,31 @@ export default function SprintDashboard() {
         description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
     });
   };
+  
+  const handleClearData = () => {
+    if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
+      updateSprints(
+        prev => prev.map(s => s.id === selectedSprintId ? { ...s, tickets: [], generatedReport: undefined, lastUpdatedAt: new Date().toISOString() } : s),
+        { title: "Sprint Data Cleared", description: "All tickets and logs have been removed." }
+      );
+    }
+  };
+
+  const handleCompleteSprint = () => {
+    if (window.confirm("Are you sure you want to complete this sprint? You will no longer be able to edit it.")) {
+      updateSprints(
+        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Completed', lastUpdatedAt: new Date().toISOString() } : s),
+        { title: "Sprint Completed", description: "The sprint has been archived." }
+      );
+    }
+  };
+  
+  const handleSaveReport = (report: string) => {
+      updateSprints(
+          prev => prev.map(s => s.id === selectedSprintId ? { ...s, generatedReport: report, lastUpdatedAt: new Date().toISOString() } : s)
+      );
+  };
+
 
   if (!isLoaded) {
     return (
@@ -502,18 +528,23 @@ export default function SprintDashboard() {
         </div>
     );
   }
+  
+  const isSprintCompleted = processedSprint.status === 'Completed';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
-       <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} />
+       <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} onSaveReport={handleSaveReport} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
        <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUploadTasks} onBulkLogProgress={handleBulkLogProgress} />
 
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Sprint Command Center</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-800">Sprint Command Center</h1>
+            {isSprintCompleted && <Badge variant="success" className="text-base"><FileArchive className="mr-2 h-4 w-4" />Completed</Badge>}
+          </div>
           <p className="text-sm text-muted-foreground">
             Data last updated at: {lastUpdated ? lastUpdated.toLocaleString() : 'N/A'}
           </p>
@@ -528,6 +559,20 @@ export default function SprintDashboard() {
                 </Select>
             </div>
              <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><PlusCircle className="mr-2 h-4 w-4" />New Sprint</Button>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon"><Settings className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleCompleteSprint} disabled={isSprintCompleted}>
+                        <Check className="mr-2 h-4 w-4" /> Complete Sprint
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleClearData} className="text-destructive" disabled={isSprintCompleted}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Clear Sprint Data
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+             </DropdownMenu>
         </div>
       </header>
       
@@ -551,7 +596,7 @@ export default function SprintDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope.toFixed(1)}h</div>
-            <p className="text-xs text-muted-foreground">Of {processedSprint.totalCapacity}h capacity</p>
+            <p className="text-xs text-muted-foreground">Of {(processedSprint.totalCapacity || 0).toFixed(1)}h capacity</p>
           </CardContent>
         </Card>
         <Card>
@@ -591,14 +636,14 @@ export default function SprintDashboard() {
               <CardTitle>Sprint Tasks</CardTitle>
                <div className="flex items-center gap-2">
                 {previousSprints && <Button onClick={handleRollback} variant="destructive"><History className="mr-2 h-4 w-4" /> Rollback Import</Button>}
-                <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline"><Upload className="mr-2 h-4 w-4" /> Bulk Upload</Button>
-                <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }}><NotebookPen className="mr-2 h-4 w-4" /> Log Progress</Button>
-                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Add Task</Button>
-                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}><BotMessageSquare className="mr-2 h-4 w-4" /> Generate Report</Button>
+                <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" disabled={isSprintCompleted}><Upload className="mr-2 h-4 w-4" /> Bulk Upload</Button>
+                <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} disabled={isSprintCompleted}><NotebookPen className="mr-2 h-4 w-4" /> Log Progress</Button>
+                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" disabled={isSprintCompleted}><PlusCircle className="mr-2 h-4 w-4" /> Add Task</Button>
+                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}><BotMessageSquare className="mr-2 h-4 w-4" /> {selectedSprint.generatedReport ? "View Report" : "Generate Report"}</Button>
             </div>
           </CardHeader>
           <CardContent>
-              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} />
+              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
           </CardContent>
        </Card>
 

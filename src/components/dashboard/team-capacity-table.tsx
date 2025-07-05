@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sprint } from "@/types"
+import { Sprint, Team } from "@/types"
 import { Progress } from "@/components/ui/progress"
 
 interface TeamCapacityTableProps {
@@ -31,15 +31,16 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
       const plannedBuild = teamTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0)
       const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
       
-      const plannedRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0)
-      const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+      const teamWorkingDays = sprint.teamCapacity?.[team as Team] ?? 0;
+      const plannedRun = Math.max(0, (teamWorkingDays * 2) - 8);
+      const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
       
       const totalPlanned = plannedBuild + plannedRun
       const totalDelivered = deliveredBuild + deliveredRun
 
       return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
     })
-  }, [sprint.tickets, sprint.teamCapacity])
+  }, [sprint])
 
   const totals = useMemo(() => {
     return capacityData.reduce((acc, data) => {
@@ -75,19 +76,19 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
                 <TableCell className="font-medium">{data.team}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span>{`${data.deliveredBuild}h / ${data.plannedBuild}h`}</span>
+                    <span>{`${data.deliveredBuild.toFixed(1)}h / ${data.plannedBuild.toFixed(1)}h`}</span>
                     <Progress value={data.plannedBuild > 0 ? (data.deliveredBuild / data.plannedBuild) * 100 : 0} className="w-20" />
                   </div>
                 </TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
-                        <span>{`${data.deliveredRun}h / ${data.plannedRun}h`}</span>
+                        <span>{`${data.deliveredRun.toFixed(1)}h / ${data.plannedRun.toFixed(1)}h`}</span>
                         <Progress value={data.plannedRun > 0 ? (data.deliveredRun / data.plannedRun) * 100 : 0} className="w-20" />
                     </div>
                 </TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
-                        <span>{`${data.totalDelivered}h / ${data.totalPlanned}h`}</span>
+                        <span>{`${data.totalDelivered.toFixed(1)}h / ${data.totalPlanned.toFixed(1)}h`}</span>
                         <Progress value={data.totalPlanned > 0 ? (data.totalDelivered / data.totalPlanned) * 100 : 0} className="w-20" />
                     </div>
                 </TableCell>
@@ -97,19 +98,19 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
                 <TableCell>Totals</TableCell>
                  <TableCell>
                   <div className="flex items-center gap-2">
-                    <span>{`${totals.deliveredBuild}h / ${totals.plannedBuild}h`}</span>
+                    <span>{`${totals.deliveredBuild.toFixed(1)}h / ${totals.plannedBuild.toFixed(1)}h`}</span>
                     <Progress value={totals.plannedBuild > 0 ? (totals.deliveredBuild / totals.plannedBuild) * 100 : 0} className="w-20" />
                   </div>
                 </TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
-                        <span>{`${totals.deliveredRun}h / ${totals.plannedRun}h`}</span>
+                        <span>{`${totals.deliveredRun.toFixed(1)}h / ${totals.plannedRun.toFixed(1)}h`}</span>
                         <Progress value={totals.plannedRun > 0 ? (totals.deliveredRun / totals.plannedRun) * 100 : 0} className="w-20" />
                     </div>
                 </TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
-                        <span>{`${totals.totalDelivered}h / ${totals.totalPlanned}h`}</span>
+                        <span>{`${totals.totalDelivered.toFixed(1)}h / ${totals.totalPlanned.toFixed(1)}h`}</span>
                         <Progress value={totals.totalPlanned > 0 ? (totals.totalDelivered / totals.totalPlanned) * 100 : 0} className="w-20" />
                     </div>
                 </TableCell>

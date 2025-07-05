@@ -27,11 +27,12 @@ import {
 
 import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar } from "./data-table-toolbar"
-import type { Ticket } from "@/types"
+import type { Sprint, Ticket } from "@/types"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  sprint: Sprint
   onUpdateTask: (task: Ticket) => void
   onDeleteTask: (taskId: string) => void
   onLogTime: (task: Ticket) => void
@@ -40,6 +41,7 @@ interface DataTableProps<TData, TValue> {
 export function TaskTable<TData extends Ticket, TValue>({
   columns,
   data,
+  sprint,
   onUpdateTask,
   onDeleteTask,
   onLogTime,
@@ -65,6 +67,7 @@ export function TaskTable<TData extends Ticket, TValue>({
       onUpdateTask,
       onDeleteTask,
       onLogTime,
+      sprint,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,

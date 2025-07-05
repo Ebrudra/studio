@@ -8,6 +8,7 @@ export const sprints: Sprint[] = [
     name: 'Q3 Sprint 1 (July 8 - July 21)',
     startDate: '2024-07-08',
     endDate: '2024-07-21',
+    status: 'Active',
     lastUpdatedAt: new Date('2024-07-15T10:00:00Z').toISOString(),
     teamCapacity: {
       'Backend': 10,
@@ -40,6 +41,7 @@ export const sprints: Sprint[] = [
     name: 'Q3 Sprint 2 (July 22 - Aug 4)',
     startDate: '2024-07-22',
     endDate: '2024-08-04',
+    status: 'Active',
     lastUpdatedAt: new Date().toISOString(),
     tickets: [
       { id: 'WIN-6001', title: 'User profile page redesign', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 0, status: 'To Do', dailyLogs: [] },

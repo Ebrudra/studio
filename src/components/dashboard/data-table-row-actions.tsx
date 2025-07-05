@@ -1,7 +1,7 @@
 "use client"
 
 import { Row } from "@tanstack/react-table"
-import { Clock, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Clock, Pencil, Trash2 } from "lucide-react"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import type { Ticket } from "@/types"
@@ -15,6 +15,7 @@ import {
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>
+  isSprintCompleted: boolean
   onUpdateTask: (task: Ticket) => void
   onDeleteTask: (taskId: string) => void
   onLogTime: (task: Ticket) => void
@@ -22,6 +23,7 @@ interface DataTableRowActionsProps<TData> {
 
 export function DataTableRowActions<TData>({
   row,
+  isSprintCompleted,
   onUpdateTask,
   onDeleteTask,
   onLogTime,
@@ -30,7 +32,9 @@ export function DataTableRowActions<TData>({
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
 
   const handleDelete = () => {
-    onDeleteTask(task.id)
+    if(window.confirm(`Are you sure you want to delete task: ${task.id}? This action cannot be undone.`)){
+        onDeleteTask(task.id)
+    }
   }
 
   return (
@@ -38,7 +42,7 @@ export function DataTableRowActions<TData>({
         <div className="flex items-center space-x-1">
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => onLogTime(task)}>
+                    <Button variant="ghost" size="icon" onClick={() => onLogTime(task)} disabled={isSprintCompleted}>
                         <Clock className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
@@ -48,7 +52,7 @@ export function DataTableRowActions<TData>({
             </Tooltip>
              <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => setIsEditDialogOpen(true)}>
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditDialogOpen(true)} disabled={isSprintCompleted}>
                         <Pencil className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
@@ -58,7 +62,7 @@ export function DataTableRowActions<TData>({
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive">
+                    <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive" disabled={isSprintCompleted}>
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>

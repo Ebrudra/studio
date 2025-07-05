@@ -8,6 +8,7 @@ import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
 import { Ticket, TicketStatus, TicketTypeScope } from "@/types"
 import { statuses } from "./data"
+import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
 
 export const columns: ColumnDef<Ticket>[] = [
   {
@@ -45,7 +46,7 @@ export const columns: ColumnDef<Ticket>[] = [
                     </Tooltip>
                  </TooltipProvider>
             )}
-          <span className="max-w-[450px] truncate font-medium">
+          <span className="max-w-[350px] truncate font-medium">
             {row.getValue("title")}
           </span>
         </div>
@@ -96,22 +97,6 @@ export const columns: ColumnDef<Ticket>[] = [
     },
   },
   {
-    accessorKey: "type",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Type" />
-    ),
-    cell: ({ row }) => {
-      return (
-        <div className="flex items-center">
-          <span>{row.getValue("type")}</span>
-        </div>
-      )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
-  },
-  {
     accessorKey: "typeScope",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Type Scope" />
@@ -143,7 +128,7 @@ export const columns: ColumnDef<Ticket>[] = [
    {
     accessorKey: "estimation",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Estimation (h)" />
+      <DataTableColumnHeader column={column} title="Est. (h)" />
     ),
     cell: ({ row }) => {
       return (
@@ -167,14 +152,43 @@ export const columns: ColumnDef<Ticket>[] = [
     },
   },
   {
+    id: "loggedDays",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Logged Days" />
+    ),
+    cell: ({ row, table }) => {
+      const sprint = (table.options.meta as any)?.sprint;
+      if (!row.original.dailyLogs?.length || !sprint?.startDate) {
+        return null;
+      }
+      
+      const sprintDays: string[] = [];
+      const interval = { start: new Date(sprint.startDate), end: new Date(sprint.endDate) };
+      const workingDays = eachDayOfInterval(interval).filter(
+        day => !isSaturday(day) && !isSunday(day)
+      );
+      workingDays.forEach(date => {
+          sprintDays.push(date.toISOString().split('T')[0]);
+      });
+
+      const loggedDayNumbers = row.original.dailyLogs.map(log => {
+        const dayIndex = sprintDays.indexOf(log.date);
+        return dayIndex !== -1 ? `D${dayIndex + 1}` : null;
+      }).filter(Boolean).join(', ');
+
+      return (
+        <div className="flex items-center justify-center">
+          <span className="truncate max-w-[100px]">{loggedDayNumbers}</span>
+        </div>
+      )
+    },
+    enableSorting: false,
+  },
+  {
     id: "actions",
     cell: ({ row, table }) => {
-       const { onUpdateTask, onDeleteTask, onLogTime } = table.options.meta as {
-        onUpdateTask: (task: Ticket) => void
-        onDeleteTask: (taskId: string) => void
-        onLogTime: (task: Ticket) => void
-      };
-      return <DataTableRowActions row={row} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onLogTime={onLogTime} />
+       const { onUpdateTask, onDeleteTask, onLogTime, sprint } = table.options.meta as any;
+      return <DataTableRowActions row={row} onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask} onLogTime={onLogTime} isSprintCompleted={sprint.status === 'Completed'}/>
     },
   },
 ]

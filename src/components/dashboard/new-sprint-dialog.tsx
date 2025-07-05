@@ -4,7 +4,7 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { eachDayOfInterval, isSaturday, isSunday, startOfWeek, endOfWeek, addDays, nextWednesday, previousTuesday } from "date-fns"
+import { eachDayOfInterval, isSaturday, isSunday, addDays, nextWednesday, previousTuesday } from "date-fns"
 import { teams } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast"
 interface NewSprintDialogProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
-  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData'>) => void
+  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData' | 'generatedReport'>) => void
 }
 
 const formSchema = z.object({
@@ -53,6 +53,11 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
   const { toast } = useToast();
 
   React.useEffect(() => {
+    if(!isOpen) {
+        form.reset();
+        return;
+    };
+    
     // Set default sprint dates to start next Wednesday and end the Tuesday after next.
     if(!startDate && !endDate) {
         const today = new Date();
@@ -61,7 +66,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
         setValue("startDate", nextWed);
         setValue("endDate", followingTue);
     }
-  }, [startDate, endDate, setValue]);
+  }, [isOpen, startDate, endDate, setValue, form]);
 
 
   React.useEffect(() => {
@@ -88,13 +93,11 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     teamsWithCapacity.forEach(team => {
         const personDays = values.teamCapacity[team as Team];
         const teamBuildHours = personDays * 6;
-        const teamRunHours = (personDays * 2) - 8; 
+        const teamRunHours = (personDays * 2) - 8; // Overhead from run hours
 
         totalBuildCapacity += teamBuildHours > 0 ? teamBuildHours : 0;
         totalRunCapacity += teamRunHours > 0 ? teamRunHours : 0;
     });
-
-    const totalCapacity = totalBuildCapacity + totalRunCapacity;
     
     if (totalRunCapacity < 0) {
         toast({
@@ -105,10 +108,13 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
         return;
     }
 
+    const totalCapacity = totalBuildCapacity + totalRunCapacity;
+
     onCreateSprint({
       name: values.name,
       startDate: values.startDate.toISOString(),
       endDate: values.endDate.toISOString(),
+      status: 'Active',
       teamCapacity: values.teamCapacity,
       totalCapacity,
       buildCapacity: totalBuildCapacity,

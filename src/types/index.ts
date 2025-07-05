@@ -39,6 +39,7 @@ export interface Sprint {
   name: string;
   startDate: string;
   endDate: string;
+  status: 'Active' | 'Completed';
   tickets: Ticket[];
   burnDownData: DailySprintData[];
   lastUpdatedAt: string;
@@ -46,4 +47,5 @@ export interface Sprint {
   totalCapacity?: number;
   buildCapacity?: number;
   runCapacity?: number;
+  generatedReport?: string;
 }
