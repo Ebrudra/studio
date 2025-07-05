@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -36,6 +37,8 @@ interface DataTableProps<TData, TValue> {
   onUpdateTask: (task: Ticket) => void
   onDeleteTask: (taskId: string) => void
   onLogTime: (task: Ticket) => void
+  viewMode: 'list' | 'byDay' | 'byTeam'
+  onViewModeChange: (mode: 'list' | 'byDay' | 'byTeam') => void
 }
 
 export function TaskTable<TData extends Ticket, TValue>({
@@ -45,10 +48,11 @@ export function TaskTable<TData extends Ticket, TValue>({
   onUpdateTask,
   onDeleteTask,
   onLogTime,
+  viewMode,
+  onViewModeChange,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
@@ -82,9 +86,14 @@ export function TaskTable<TData extends Ticket, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
+  React.useEffect(() => {
+    table.getColumn('loggedDays')?.toggleVisibility(viewMode !== 'byDay');
+    table.getColumn('scope')?.toggleVisibility(viewMode !== 'byTeam');
+  }, [viewMode, table])
+
   return (
     <div className="space-y-4">
-      <DataTableToolbar table={table} />
+      <DataTableToolbar table={table} viewMode={viewMode} onViewModeChange={onViewModeChange} />
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -107,21 +116,33 @@ export function TaskTable<TData extends Ticket, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const original = row.original as any;
+                if (original.isGroupHeader) {
+                    return (
+                        <TableRow key={`header-${original.title}`} className="bg-muted/50 hover:bg-muted/50">
+                            <TableCell colSpan={columns.length} className="font-bold text-base py-2">
+                                {original.title}
+                            </TableCell>
+                        </TableRow>
+                    )
+                }
+                return (
+                    <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                    >
+                        {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                            {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                            )}
+                        </TableCell>
+                        ))}
+                    </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell

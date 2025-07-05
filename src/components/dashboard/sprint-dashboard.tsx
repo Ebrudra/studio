@@ -50,6 +50,8 @@ export default function SprintDashboard() {
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
   const [taskToLog, setTaskToLog] = useState<Ticket | null>(null);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'byDay' | 'byTeam'>('list');
+
 
   const { toast } = useToast();
 
@@ -206,16 +208,6 @@ export default function SprintDashboard() {
             description: `Total time logged on 'Run' activities (${runEffort.toFixed(1)}h) has exceeded the planned 'Run' capacity (${runCapacity.toFixed(1)}h).`
         });
     }
-
-    // Burn-down warning logic would need to be moved here, or chart data passed back up.
-    // For now, this is disabled to avoid complexity.
-    // const dayDataForToday = processedSprint.burnDownData.find(d => d.date === today);
-    // if(dayDataForToday && dayDataForToday.actual > dayDataForToday.ideal) {
-    //     warnings.push({
-    //         title: "Behind Schedule",
-    //         description: "The actual burn is higher than the ideal burn. The team is behind schedule."
-    //     })
-    // }
 
     return warnings;
   }, [processedSprint]);
@@ -556,6 +548,66 @@ export default function SprintDashboard() {
           prev => prev.map(s => s.id === selectedSprintId ? { ...s, generatedReport: report, lastUpdatedAt: new Date().toISOString() } : s)
       );
   };
+  
+  const tableData = useMemo(() => {
+    if (!processedSprint) return [];
+
+    if (viewMode === 'list') {
+        return processedSprint.tickets;
+    }
+
+    if (viewMode === 'byDay') {
+        const groupedByDay: { [key: string]: Ticket[] } = {};
+        
+        processedSprint.tickets.forEach(ticket => {
+            ticket.dailyLogs?.forEach(log => {
+                if (!groupedByDay[log.date]) {
+                    groupedByDay[log.date] = [];
+                }
+                // Augment ticket with the specific log for that day to show in table if needed
+                const ticketForDay = { ...ticket, dayLog: log };
+                
+                // Avoid duplicating tickets if they have multiple logs on the same day
+                if (!groupedByDay[log.date].some(t => t.id === ticket.id)) {
+                    groupedByDay[log.date].push(ticketForDay);
+                }
+            });
+        });
+
+        const flatData: any[] = [];
+        const sprintDayMap = new Map(processedSprint.burnDownData.map((d) => [d.date, `Day ${d.day}`]));
+        const sortedDates = Object.keys(groupedByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+        sortedDates.forEach(date => {
+            const dayLabel = sprintDayMap.get(date) || 'Unknown Day';
+            flatData.push({ isGroupHeader: true, title: `${dayLabel} (${new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})` });
+            flatData.push(...groupedByDay[date]);
+        });
+        return flatData;
+    }
+    
+    if (viewMode === 'byTeam') {
+        const groupedByTeam: { [key in Team]?: Ticket[] } = {};
+        
+        processedSprint.tickets.forEach(ticket => {
+            if (!groupedByTeam[ticket.scope]) {
+                groupedByTeam[ticket.scope] = [];
+            }
+            groupedByTeam[ticket.scope].push(ticket);
+        });
+        
+        const flatData: any[] = [];
+        teams.forEach(team => {
+            if (groupedByTeam[team] && groupedByTeam[team]!.length > 0) {
+                flatData.push({ isGroupHeader: true, title: team });
+                flatData.push(...groupedByTeam[team]!);
+            }
+        })
+        return flatData;
+    }
+
+    return [];
+  }, [processedSprint, viewMode]);
 
 
   if (!isLoaded) {
@@ -719,7 +771,7 @@ export default function SprintDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+              <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
           </CardContent>
        </Card>
 
