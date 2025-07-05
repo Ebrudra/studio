@@ -50,6 +50,10 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
             const buildCapacity = sprint.teamCapacity[team]?.plannedBuild || 0;
             personDays[team] = buildCapacity / 6;
         }
+    } else {
+       teams.forEach(team => {
+            personDays[team] = 0;
+        });
     }
     return personDays;
   }, [sprint.teamCapacity]);
@@ -64,7 +68,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
     },
   });
   
-  const { watch, setValue, trigger, reset } = form;
+  const { watch, setValue, reset, formState: { touchedFields } } = form;
   const startDate = watch("startDate");
   const endDate = watch("endDate");
   const { toast } = useToast();
@@ -88,13 +92,13 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       ).length;
 
       teams.forEach((team) => {
-        // Only update if it hasn't been manually set from the default
-        if (form.getValues(`teamPersonDays.${team}`) === (sprint.teamCapacity?.[team]?.plannedBuild || 0) / 6) {
+        // Only update if the field hasn't been manually touched by the user
+        if (!touchedFields.teamPersonDays?.[team as keyof typeof touchedFields.teamPersonDays]) {
           setValue(`teamPersonDays.${team}`, weekDays, { shouldValidate: true });
         }
       });
     }
-  }, [startDate, endDate, setValue, trigger, sprint, form]);
+  }, [startDate, endDate, setValue, sprint, touchedFields]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const teamCapacity: Record<Team, TeamCapacity> = {} as Record<Team, TeamCapacity>;
