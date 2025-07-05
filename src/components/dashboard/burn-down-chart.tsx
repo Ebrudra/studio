@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -26,11 +27,6 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
   const teamsInSprint = useMemo(() => [ALL_TEAMS, ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
 
   const chartData = useMemo(() => {
-    let rawData = sprint.burnDownData;
-    if (!showFullProjection) {
-        rawData = sprint.burnDownData.filter(d => d.date <= today)
-    }
-
     const sprintDurationInDays = sprint.burnDownData.length;
     if (sprintDurationInDays === 0) return [];
 
@@ -48,26 +44,30 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
     const totalScope = filteredTickets.reduce((acc, t) => acc + t.estimation, 0)
     const idealBurnPerDay = totalScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
 
-    const dailyCompletion = new Map<string, number>()
+    const dailyLoggedHours = new Map<string, number>();
     for (const ticket of filteredTickets) {
-      if (ticket.status === 'Done' && ticket.completionDate) {
-        const completionDay = ticket.completionDate.split('T')[0]
-        dailyCompletion.set(completionDay, (dailyCompletion.get(completionDay) || 0) + ticket.estimation)
-      }
+        if (ticket.dailyLogs) {
+            for (const log of ticket.dailyLogs) {
+                const currentHours = dailyLoggedHours.get(log.date) || 0;
+                dailyLoggedHours.set(log.date, currentHours + log.loggedHours);
+            }
+        }
     }
 
-    let remainingScope = totalScope
+    let remainingScope = totalScope;
     const processedData = sprint.burnDownData.map((dayData, index) => {
-      const completedToday = dailyCompletion.get(dayData.date) || 0
-      remainingScope -= completedToday
-      
-      return {
-        name: `Day ${dayData.day}`,
-        "Ideal Burn": parseFloat((totalScope - (index * idealBurnPerDay)).toFixed(2)),
-        "Actual Burn": remainingScope < 0 ? 0 : remainingScope,
-        date: dayData.date
-      }
-    })
+        const loggedToday = dailyLoggedHours.get(dayData.date) || 0;
+        remainingScope -= loggedToday;
+
+        const idealBurn = parseFloat((totalScope - (index * idealBurnPerDay)).toFixed(2));
+
+        return {
+            name: `Day ${dayData.day}`,
+            "Ideal Burn": idealBurn < 0 ? 0 : idealBurn,
+            "Actual Burn": remainingScope < 0 ? 0 : remainingScope,
+            date: dayData.date
+        }
+    });
     
     if (!showFullProjection) {
         return processedData.filter(d => d.date <= today)
