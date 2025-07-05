@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -18,7 +19,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "../ui/date-picker"
-import type { Sprint, Team } from "@/types"
+import type { Sprint, Team, TeamCapacity } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 
 interface NewSprintDialogProps {
@@ -31,7 +32,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Sprint name is required"),
   startDate: z.date({ required_error: "Start date is required" }),
   endDate: z.date({ required_error: "End date is required" }),
-  teamCapacity: z.record(z.coerce.number().min(0, "Days must be non-negative").default(0)),
+  teamPersonDays: z.record(z.coerce.number().min(0, "Days must be non-negative").default(0)),
 }).refine(data => data.endDate > data.startDate, {
   message: "End date must be after start date",
   path: ["endDate"],
@@ -43,7 +44,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      teamCapacity: teams.reduce((acc, team) => ({ ...acc, [team]: 0 }), {} as Record<Team, number>),
+      teamPersonDays: teams.reduce((acc, team) => ({ ...acc, [team]: 0 }), {} as Record<Team, number>),
     },
   })
   
@@ -77,48 +78,48 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       ).length;
 
       teams.forEach((team) => {
-        setValue(`teamCapacity.${team}`, weekDays, { shouldValidate: true });
+        setValue(`teamPersonDays.${team}`, weekDays, { shouldValidate: true });
       });
     }
   }, [startDate, endDate, setValue, trigger]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    let totalBuildCapacity = 0;
-    let totalRunCapacity = 0;
+    const teamCapacity: Record<Team, TeamCapacity> = {} as Record<Team, TeamCapacity>;
+    let hasInvalidCapacity = false;
 
-    const teamsWithCapacity = Object.keys(values.teamCapacity).filter(
-      (team) => values.teamCapacity[team as Team] > 0
-    );
+    teams.forEach(team => {
+      const personDays = values.teamPersonDays[team as Team];
+      const plannedBuild = personDays * 6;
+      const plannedRun = (personDays * 2) - 8; // 8h overhead from run hours
 
-    teamsWithCapacity.forEach(team => {
-        const personDays = values.teamCapacity[team as Team];
-        const teamBuildHours = personDays * 6;
-        const teamRunHours = (personDays * 2) - 8; // Overhead from run hours
-
-        totalBuildCapacity += teamBuildHours > 0 ? teamBuildHours : 0;
-        totalRunCapacity += teamRunHours > 0 ? teamRunHours : 0;
-    });
-    
-    if (totalRunCapacity < 0) {
+      if (plannedRun < 0) {
         toast({
             variant: "destructive",
-            title: "Invalid Capacity",
-            description: "Total Run capacity cannot be negative. Please adjust team days."
+            title: `Invalid Capacity for ${team}`,
+            description: `Run capacity for ${team} is negative (${plannedRun}h). Please adjust person-days.`
         });
+        hasInvalidCapacity = true;
+      }
+
+      teamCapacity[team as Team] = { plannedBuild, plannedRun };
+    });
+    
+    if (hasInvalidCapacity) {
         return;
     }
-
-    const totalCapacity = totalBuildCapacity + totalRunCapacity;
+    
+    const totalBuild = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedBuild, 0);
+    const totalRun = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedRun, 0);
 
     onCreateSprint({
       name: values.name,
       startDate: values.startDate.toISOString(),
       endDate: values.endDate.toISOString(),
       status: 'Active',
-      teamCapacity: values.teamCapacity,
-      totalCapacity,
-      buildCapacity: totalBuildCapacity,
-      runCapacity: totalRunCapacity,
+      teamCapacity: teamCapacity,
+      totalCapacity: totalBuild + totalRun,
+      buildCapacity: totalBuild,
+      runCapacity: totalRun,
     })
     setIsOpen(false)
     form.reset()
@@ -173,13 +174,13 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
               />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-medium">Team Capacity (Working Days)</h3>
+              <h3 className="mb-2 text-sm font-medium">Team Person-Days</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {teams.map(team => (
                   <FormField
                     key={team}
                     control={form.control}
-                    name={`teamCapacity.${team}`}
+                    name={`teamPersonDays.${team}`}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{team}</FormLabel>
@@ -203,3 +204,5 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     </Dialog>
   )
 }
+
+    

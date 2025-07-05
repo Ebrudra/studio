@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
-import type { Sprint, Ticket, DailySprintData, Team, DailyLog, TicketStatus, TicketTypeScope } from '@/types';
+import type { Sprint, Ticket, DailySprintData, Team, DailyLog, TicketStatus, TicketTypeScope, TeamCapacity } from '@/types';
 import { eachDayOfInterval, isSaturday, isSunday } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { InsightBulb } from './insight-bulb';
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -59,7 +61,6 @@ export default function SprintDashboard() {
       }
     } catch (error) {
       console.error("Failed to load sprints from localStorage", error);
-      setSprints(initialSprints);
     }
     setIsLoaded(true);
   }, []);
@@ -99,6 +100,10 @@ export default function SprintDashboard() {
     const tickets = selectedSprint.tickets.map(ticket => 
         (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
+
+    const buildCapacity = Object.values(selectedSprint.teamCapacity).reduce((acc, team) => acc + team.plannedBuild, 0);
+    const runCapacity = Object.values(selectedSprint.teamCapacity).reduce((acc, team) => acc + team.plannedRun, 0);
+    const totalCapacity = buildCapacity + runCapacity;
 
     const bdcTickets = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
     const totalScope = bdcTickets.reduce((acc, ticket) => acc + ticket.estimation, 0);
@@ -154,7 +159,7 @@ export default function SprintDashboard() {
       }
     });
 
-    return { ...selectedSprint, summaryMetrics, burnDownData, tickets };
+    return { ...selectedSprint, summaryMetrics, burnDownData, tickets, totalCapacity, buildCapacity, runCapacity };
   }, [selectedSprint]);
 
   const dailyProgressData = useMemo((): DailyProgressData[] => {
@@ -234,19 +239,17 @@ export default function SprintDashboard() {
     return warnings;
   }, [processedSprint]);
   
-  const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo?: { title: string, description: string }) => {
+  const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
     setSprints(currentSprints => {
         const newSprints = updateFn(currentSprints);
-        if (toastInfo) {
-            toast(toastInfo);
-        }
         return newSprints;
     });
   };
 
   const handleBulkUpdate = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo: { title: string, description: string }) => {
     setPreviousSprints(sprints);
-    updateSprints(updateFn, toastInfo);
+    updateSprints(updateFn);
+    toast(toastInfo);
   }
 
   const handleRollback = () => {
@@ -290,18 +293,36 @@ export default function SprintDashboard() {
     );
   };
 
+  const handleUpdateTeamCapacity = (team: Team, capacity: TeamCapacity) => {
+    updateSprints(prevSprints =>
+      prevSprints.map(sprint =>
+        sprint.id === selectedSprintId
+          ? {
+              ...sprint,
+              teamCapacity: {
+                ...sprint.teamCapacity,
+                [team]: capacity,
+              },
+              lastUpdatedAt: new Date().toISOString(),
+            }
+          : sprint
+      )
+    );
+  };
+
   const handleDeleteTask = (taskId: string) => {
-      updateSprints(prevSprints =>
-        prevSprints.map(sprint =>
-          sprint.id === selectedSprintId
-            ? {
-                ...sprint,
-                tickets: sprint.tickets.filter(t => t.id !== taskId),
-                lastUpdatedAt: new Date().toISOString(),
-              }
-            : sprint
-        ), { title: "Task Deleted", description: `Task ${taskId} has been removed.` }
-      );
+    updateSprints(prevSprints =>
+      prevSprints.map(sprint =>
+        sprint.id === selectedSprintId
+          ? {
+              ...sprint,
+              tickets: sprint.tickets.filter(t => t.id !== taskId),
+              lastUpdatedAt: new Date().toISOString(),
+            }
+          : sprint
+      )
+    );
+    toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
   };
   
   const handleLogRowAction = (task: Ticket) => {
@@ -373,7 +394,7 @@ export default function SprintDashboard() {
   
   const handleBulkUploadTasks = (tasks: BulkTask[]) => {
     let addedCount = 0;
-    handleBulkUpdate(prevSprints => {
+    const updateFn = (prevSprints: Sprint[]) => {
       const sprintToUpdate = prevSprints.find(s => s.id === selectedSprintId);
       if (!sprintToUpdate) return prevSprints;
 
@@ -400,7 +421,8 @@ export default function SprintDashboard() {
         return prevSprints.map(s => s.id === selectedSprintId ? { ...s, tickets: [...s.tickets, ...newTickets], lastUpdatedAt: new Date().toISOString() } : s);
       }
       return prevSprints;
-    }, { title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
+    };
+    handleBulkUpdate(updateFn, { title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
   };
 
   const handleBulkLogProgress = (logs: BulkProgressLog[]) => {
@@ -409,7 +431,7 @@ export default function SprintDashboard() {
 
     logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    handleBulkUpdate(prevSprints => {
+    const updateFn = (prevSprints: Sprint[]) => {
         return prevSprints.map(sprint => {
             if (sprint.id !== selectedSprintId) return sprint;
 
@@ -470,7 +492,8 @@ export default function SprintDashboard() {
 
             return { ...sprint, tickets: Array.from(ticketsMap.values()), lastUpdatedAt: new Date().toISOString() };
         });
-    }, {
+    };
+    handleBulkUpdate(updateFn, {
         title: "Progress Log Upload Complete",
         description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
     });
@@ -479,18 +502,18 @@ export default function SprintDashboard() {
   const handleClearData = () => {
     if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
       updateSprints(
-        prev => prev.map(s => s.id === selectedSprintId ? { ...s, tickets: [], generatedReport: undefined, lastUpdatedAt: new Date().toISOString() } : s),
-        { title: "Sprint Data Cleared", description: "All tickets and logs have been removed." }
+        prev => prev.map(s => s.id === selectedSprintId ? { ...s, tickets: [], generatedReport: undefined, lastUpdatedAt: new Date().toISOString() } : s)
       );
+      toast({ title: "Sprint Data Cleared", description: "All tickets and logs have been removed." });
     }
   };
 
   const handleCompleteSprint = () => {
     if (window.confirm("Are you sure you want to complete this sprint? You will no longer be able to edit it.")) {
       updateSprints(
-        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Completed', lastUpdatedAt: new Date().toISOString() } : s),
-        { title: "Sprint Completed", description: "The sprint has been archived." }
+        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Completed', lastUpdatedAt: new Date().toISOString() } : s)
       );
+      toast({ title: "Sprint Completed", description: "The sprint has been archived." });
     }
   };
   
@@ -592,7 +615,10 @@ export default function SprintDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Scope</CardTitle>
-            <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+                <InsightBulb insight="This is the total estimated effort for all 'Build' and 'Run' tasks in the sprint. It increases if new bugs are found or out-of-scope work is added." />
+                <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope.toFixed(1)}h</div>
@@ -602,7 +628,10 @@ export default function SprintDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Work Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+             <div className="flex items-center gap-2">
+                <InsightBulb insight="Represents the total estimation of all tasks marked as 'Done'." />
+                <CheckCircle className="h-4 w-4 text-green-500" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{processedSprint.summaryMetrics.completedWork.toFixed(1)}h</div>
@@ -612,7 +641,10 @@ export default function SprintDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Work Remaining</CardTitle>
-            <ListTodo className="h-4 w-4 text-muted-foreground" />
+             <div className="flex items-center gap-2">
+                <InsightBulb insight="The amount of estimated work left to be completed in the sprint." />
+                <ListTodo className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
@@ -622,7 +654,10 @@ export default function SprintDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Percentage Complete</CardTitle>
-            <Zap className="h-4 w-4 text-primary" />
+             <div className="flex items-center gap-2">
+                <InsightBulb insight="The percentage of completed work against the total scope." />
+                <Zap className="h-4 w-4 text-primary" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{processedSprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
@@ -630,10 +665,13 @@ export default function SprintDashboard() {
           </CardContent>
         </Card>
       </section>
-
+      
       <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Sprint Tasks</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle>Sprint Tasks</CardTitle>
+                <InsightBulb insight="This table lists all tasks in the sprint. Use the actions on the right to log time, edit, or delete tasks." />
+              </div>
                <div className="flex items-center gap-2">
                 {previousSprints && <Button onClick={handleRollback} variant="destructive"><History className="mr-2 h-4 w-4" /> Rollback Import</Button>}
                 <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" disabled={isSprintCompleted}><Upload className="mr-2 h-4 w-4" /> Bulk Upload</Button>
@@ -650,17 +688,32 @@ export default function SprintDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
            <Card className="h-full">
-            <CardHeader><CardTitle>Sprint Burn-down</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <CardTitle>Sprint Burn-down</CardTitle>
+                    <InsightBulb insight="This chart tracks remaining work vs. ideal progress. If the blue line ('Actual Burn') is above the gray dotted line ('Ideal Burn'), the team is behind schedule." />
+                </div>
+            </CardHeader>
             <CardContent><BurnDownChart sprint={processedSprint} /></CardContent>
            </Card>
         </div>
         <div className="lg:col-span-2 space-y-6">
             <Card>
-                <CardHeader><CardTitle>Scope Distribution (by Estimation)</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <CardTitle>Scope Distribution</CardTitle>
+                        <InsightBulb insight="How the total estimated work (scope) is divided between Build, Run, and Sprint tasks." />
+                    </div>
+                </CardHeader>
                 <CardContent><ScopeDistributionChart tickets={processedSprint.tickets} /></CardContent>
             </Card>
              <Card>
-                <CardHeader><CardTitle>Work Distribution (by Logged Hours)</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <CardTitle>Work Distribution</CardTitle>
+                        <InsightBulb insight="How the actual logged hours are divided. This shows where the team's effort is really going." />
+                    </div>
+                </CardHeader>
                 <CardContent><WorkDistributionChart tickets={processedSprint.tickets} /></CardContent>
             </Card>
         </div>
@@ -668,7 +721,7 @@ export default function SprintDashboard() {
       
        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
-             <TeamCapacityTable sprint={processedSprint} />
+             <TeamCapacityTable sprint={processedSprint} onUpdateTeamCapacity={handleUpdateTeamCapacity} isSprintCompleted={isSprintCompleted} />
         </div>
          <div className="lg:col-span-2 space-y-6"></div>
       </div>
@@ -678,3 +731,5 @@ export default function SprintDashboard() {
     </div>
   );
 }
+
+    

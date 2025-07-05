@@ -1,3 +1,4 @@
+
 import type { Sprint, Team } from '@/types';
 
 export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android', 'Mobile'];
@@ -11,15 +12,13 @@ export const sprints: Sprint[] = [
     status: 'Active',
     lastUpdatedAt: new Date('2024-07-15T10:00:00Z').toISOString(),
     teamCapacity: {
-      'Backend': 10,
-      'iOS': 9,
-      'Web': 10,
-      'Android': 8,
-      'Mobile': 5,
+      'Backend': { plannedBuild: 60, plannedRun: 12 },
+      'iOS': { plannedBuild: 54, plannedRun: 10 },
+      'Web': { plannedBuild: 60, plannedRun: 12 },
+      'Android': { plannedBuild: 48, plannedRun: 8 },
+      'Mobile': { plannedBuild: 30, plannedRun: 2 },
+      'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
     },
-    totalCapacity: 336,
-    buildCapacity: 268.8,
-    runCapacity: 67.2,
     tickets: [
       { id: 'WIN-5929', title: 'Implement new login flow', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', completionDate: '2024-07-09T10:00:00.000Z', dailyLogs: [{ date: '2024-07-09', loggedHours: 8 }] },
       { id: 'WIN-5930', title: 'Fix API authentication issue', scope: 'Backend', type: 'Bug', typeScope: 'Run', estimation: 5, timeLogged: 6, status: 'Done', completionDate: '2024-07-10T10:00:00.000Z', dailyLogs: [{ date: '2024-07-10', loggedHours: 6 }] },
@@ -43,6 +42,14 @@ export const sprints: Sprint[] = [
     endDate: '2024-08-04',
     status: 'Active',
     lastUpdatedAt: new Date().toISOString(),
+     teamCapacity: {
+      'Backend': { plannedBuild: 60, plannedRun: 12 },
+      'iOS': { plannedBuild: 60, plannedRun: 12 },
+      'Web': { plannedBuild: 60, plannedRun: 12 },
+      'Android': { plannedBuild: 60, plannedRun: 12 },
+      'Mobile': { plannedBuild: 60, plannedRun: 12 },
+      'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
+    },
     tickets: [
       { id: 'WIN-6001', title: 'User profile page redesign', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 0, status: 'To Do', dailyLogs: [] },
       { id: 'WIN-6002', title: 'Database migration script', scope: 'Backend', type: 'Task', typeScope: 'Build', estimation: 21, timeLogged: 0, status: 'To Do', dailyLogs: [] },
@@ -52,3 +59,5 @@ export const sprints: Sprint[] = [
     burnDownData: []
   },
 ];
+
+    

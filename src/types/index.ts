@@ -1,3 +1,4 @@
+
 export type Team = 'Backend' | 'iOS' | 'Web' | 'Android' | 'Mobile' | 'Out of Scope';
 export type TicketType = 'User story' | 'Bug' | 'Task' | 'Buffer';
 export type TicketTypeScope = 'Build' | 'Run' | 'Sprint';
@@ -34,6 +35,11 @@ export interface DailySprintData {
   dailyRunByTeam: Record<Team, number>;
 }
 
+export interface TeamCapacity {
+  plannedBuild: number;
+  plannedRun: number;
+}
+
 export interface Sprint {
   id: string;
   name: string;
@@ -43,9 +49,11 @@ export interface Sprint {
   tickets: Ticket[];
   burnDownData: DailySprintData[];
   lastUpdatedAt: string;
-  teamCapacity?: Record<Team, number>;
+  teamCapacity: Record<Team, TeamCapacity>;
   totalCapacity?: number;
   buildCapacity?: number;
   runCapacity?: number;
   generatedReport?: string;
 }
+
+    

@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -17,14 +18,10 @@ interface WorkDistributionChartProps {
 
 export function WorkDistributionChart({ tickets }: WorkDistributionChartProps) {
   const data = useMemo(() => {
-    const scopeData: { [key in TicketTypeScope]?: number } = {}
+    const scopeData: { [key in TicketTypeScope]?: number } = { Build: 0, Run: 0, Sprint: 0 }
     
     tickets.forEach(ticket => {
-      if (scopeData[ticket.typeScope]) {
         scopeData[ticket.typeScope]! += ticket.timeLogged
-      } else {
-        scopeData[ticket.typeScope] = ticket.timeLogged
-      }
     })
 
     return (Object.entries(scopeData) as [TicketTypeScope, number][])
@@ -44,6 +41,7 @@ export function WorkDistributionChart({ tickets }: WorkDistributionChartProps) {
 
   return (
     <div className="h-[250px] w-full">
+      <div className="text-center text-lg font-bold -mt-4 mb-2">{totalLogged.toFixed(1)}h Total Logged</div>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Tooltip
@@ -59,19 +57,22 @@ export function WorkDistributionChart({ tickets }: WorkDistributionChartProps) {
               return null
             }}
           />
-          <Legend />
+          <Legend
+            verticalAlign="bottom"
+            height={36}
+            formatter={(value, entry) => <span className="text-foreground">{value}</span>}
+          />
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
+            cy="45%"
             labelLine={false}
             label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                if (percent < 0.05) return null; // Don't render label if too small
                 const RADIAN = Math.PI / 180;
                 const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                if (percent < 0.05) return null; // Don't render label if too small
 
                 return (
                     <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12}>
@@ -94,3 +95,5 @@ export function WorkDistributionChart({ tickets }: WorkDistributionChartProps) {
     </div>
   )
 }
+
+    
