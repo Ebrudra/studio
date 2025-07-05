@@ -55,7 +55,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       name: sprint.name,
       startDate: new Date(sprint.startDate),
       endDate: new Date(sprint.endDate),
-      sprintDays: sprint.sprintDays.map(d => ({ ...d, date: new Date(d.date) })),
+      sprintDays: (sprint.sprintDays || []).map(d => ({ ...d, date: new Date(d.date) })),
       teamPersonDays: {},
     },
   });
@@ -80,7 +80,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
         name: sprint.name,
         startDate: new Date(sprint.startDate),
         endDate: new Date(sprint.endDate),
-        sprintDays: sprint.sprintDays.map(d => ({ ...d, date: new Date(d.date) })),
+        sprintDays: (sprint.sprintDays || []).map(d => ({ ...d, date: new Date(d.date) })),
         teamPersonDays: personDays,
       });
     }
