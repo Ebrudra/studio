@@ -4,14 +4,14 @@
 import * as React from "react"
 import { useMemo, useState } from "react"
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import type { Sprint, Team, DailySprintData } from "@/types"
+import type { Sprint, Team } from "@/types"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 
 interface BurnDownChartProps {
-  sprint: Sprint & { burnDownData: DailySprintData[] }
+  sprint: Sprint & { burnDownData: { day: number; date: string }[] }
 }
 
 type ScopeFilter = "Total" | "Build" | "Run"
@@ -41,32 +41,59 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
       filteredTickets = filteredTickets.filter(t => t.typeScope !== 'Sprint')
     }
 
-    const totalScope = filteredTickets.reduce((acc, t) => acc + t.estimation, 0)
-    const idealBurnPerDay = totalScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
+    const sprintStartDate = sprint.burnDownData[0]?.date;
+    if (!sprintStartDate) return [];
 
-    const dailyLoggedHours = new Map<string, number>();
+    const initialScope = filteredTickets
+        .filter(t => !t.creationDate || t.creationDate <= sprintStartDate)
+        .reduce((acc, t) => acc + t.estimation, 0);
+
+    const idealBurnPerDay = initialScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1);
+
+    const dailyDelta = new Map<string, { newScope: number; loggedHours: number }>();
+    sprint.burnDownData.forEach(day => {
+        dailyDelta.set(day.date, { newScope: 0, loggedHours: 0 });
+    });
+    
     for (const ticket of filteredTickets) {
+        if (ticket.creationDate && ticket.creationDate > sprintStartDate) {
+            const delta = dailyDelta.get(ticket.creationDate);
+            if (delta) {
+                delta.newScope += ticket.estimation;
+            }
+        }
+
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
-                const currentHours = dailyLoggedHours.get(log.date) || 0;
-                dailyLoggedHours.set(log.date, currentHours + log.loggedHours);
+                const delta = dailyDelta.get(log.date);
+                if (delta) {
+                    delta.loggedHours += log.loggedHours;
+                }
             }
         }
     }
 
-    let remainingScope = totalScope;
+    let cumulativeLogged = 0;
+    let cumulativeNewScope = 0;
     const processedData = sprint.burnDownData.map((dayData, index) => {
-        const loggedToday = dailyLoggedHours.get(dayData.date) || 0;
-        remainingScope -= loggedToday;
+        const delta = dailyDelta.get(dayData.date) || { newScope: 0, loggedHours: 0 };
+        cumulativeLogged += delta.loggedHours;
+        
+        // New scope is added to the total on the day it's created.
+        if (dayData.date > sprintStartDate) {
+            const scopeAddedYesterday = dailyDelta.get(sprint.burnDownData[index-1].date)?.newScope || 0;
+            cumulativeNewScope += scopeAddedYesterday;
+        }
 
-        const idealBurn = parseFloat((totalScope - (index * idealBurnPerDay)).toFixed(2));
+        const remainingScope = initialScope + cumulativeNewScope - cumulativeLogged;
+        const idealBurn = parseFloat((initialScope - (index * idealBurnPerDay)).toFixed(2));
 
         return {
             name: `Day ${dayData.day}`,
             "Ideal Burn": idealBurn < 0 ? 0 : idealBurn,
             "Actual Burn": remainingScope < 0 ? 0 : remainingScope,
             date: dayData.date
-        }
+        };
     });
     
     if (!showFullProjection) {
