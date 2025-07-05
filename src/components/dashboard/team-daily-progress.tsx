@@ -74,7 +74,6 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[50px] sticky left-0 bg-background z-10">Day</TableHead>
-              <TableHead className="min-w-[120px]">Date</TableHead>
               {activeTeams.map(team => (
                 <TableHead key={team} colSpan={2} className="text-center min-w-[150px] border-l">{team}</TableHead>
               ))}
@@ -82,7 +81,6 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
             </TableRow>
              <TableRow className="text-xs text-muted-foreground">
                 <TableHead className="sticky left-0 bg-background z-10"></TableHead>
-                <TableHead></TableHead>
                 {activeTeams.map(team => (
                     <React.Fragment key={team}>
                         <TableHead className="text-right border-l">Build</TableHead>
@@ -102,10 +100,7 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
 
               return (
                  <TableRow key={day.day}>
-                    <TableCell className="font-medium sticky left-0 bg-background z-10">Day {day.day}</TableCell>
-                    <TableCell>
-                    {new Date(day.date).toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}
-                    </TableCell>
+                    <TableCell className="font-medium sticky left-0 bg-background z-10">D{day.day}</TableCell>
                     {activeTeams.map(team => (
                          <React.Fragment key={team}>
                             <TableCell className="text-right border-l">
@@ -124,7 +119,7 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
           </TableBody>
            <TableFooter>
             <TableRow className="font-bold bg-muted/50">
-              <TableCell colSpan={2} className="sticky left-0 bg-muted/50 z-10">Grand Total</TableCell>
+              <TableCell className="sticky left-0 bg-muted/50 z-10">Grand Total</TableCell>
               {activeTeams.map(team => (
                 <React.Fragment key={team}>
                     <TableCell className="text-right border-l">
