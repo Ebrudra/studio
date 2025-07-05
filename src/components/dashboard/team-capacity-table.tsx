@@ -27,7 +27,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
   const [editingValues, setEditingValues] = useState<Record<string, { build: string; run: string }>>({});
 
   const capacityData = useMemo(() => {
-    const teamsInSprint = Object.keys(sprint.teamCapacity) as Team[];
+    const teamsInSprint = Object.keys(sprint.teamCapacity || {}) as Team[];
 
     return teamsInSprint.map(team => {
       const teamTickets = sprint.tickets.filter(t => t.scope === team)
@@ -39,7 +39,7 @@ export function TeamCapacityTable({ sprint, isSprintCompleted, onUpdateTeamCapac
       const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
       
       const totalPlanned = plannedBuild + plannedRun
-      const totalDelivered = deliveredBuild + deliveredRun
+      const totalDelivered = deliveredBuild + totalRun
 
       return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
     })
