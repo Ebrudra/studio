@@ -27,8 +27,9 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
   const teamsInSprint = useMemo(() => [ALL_TEAMS, ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
 
   const chartData = useMemo(() => {
+    if (!sprint.sprintDays || sprint.sprintDays.length === 0) return [];
+
     const sprintDurationInDays = sprint.sprintDays.length;
-    if (sprintDurationInDays === 0) return [];
 
     let filteredTickets = sprint.tickets
     if (teamFilter !== ALL_TEAMS) {
