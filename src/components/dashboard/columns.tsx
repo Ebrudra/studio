@@ -1,3 +1,4 @@
+
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
@@ -8,7 +9,6 @@ import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
 import { Ticket, TicketStatus, TicketTypeScope } from "@/types"
 import { statuses } from "./data"
-import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
 
 export const columns: ColumnDef<Ticket>[] = [
   {
@@ -158,22 +158,15 @@ export const columns: ColumnDef<Ticket>[] = [
     ),
     cell: ({ row, table }) => {
       const sprint = (table.options.meta as any)?.sprint;
-      if (!row.original.dailyLogs?.length || !sprint?.startDate) {
+      if (!row.original.dailyLogs?.length || !sprint?.sprintDays) {
         return null;
       }
       
-      const sprintDays: string[] = [];
-      const interval = { start: new Date(sprint.startDate), end: new Date(sprint.endDate) };
-      const workingDays = eachDayOfInterval(interval).filter(
-        day => !isSaturday(day) && !isSunday(day)
-      );
-      workingDays.forEach(date => {
-          sprintDays.push(date.toISOString().split('T')[0]);
-      });
+      const sprintDayMap = new Map(sprint.sprintDays.map((d: any) => [d.date, d.day]));
 
       const loggedDayNumbers = row.original.dailyLogs.map(log => {
-        const dayIndex = sprintDays.indexOf(log.date);
-        return dayIndex !== -1 ? `D${dayIndex + 1}` : null;
+        const dayNumber = sprintDayMap.get(log.date);
+        return dayNumber ? `D${dayNumber}` : null;
       }).filter(Boolean).join(', ');
 
       return (

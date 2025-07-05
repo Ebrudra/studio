@@ -5,7 +5,6 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { eachDayOfInterval, isSaturday, isSunday } from "date-fns"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -71,26 +70,17 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   const isNewTicket = selectedTicketId === 'new-ticket'
 
   const sprintDays = React.useMemo(() => {
-    if (!sprint.startDate || !sprint.endDate) return [];
+    if (!sprint.sprintDays) return [];
     
-    const startDate = new Date(sprint.startDate);
-    const endDate = new Date(sprint.endDate);
-
-    if (startDate > endDate) return [];
-
-    const interval = { start: startDate, end: endDate };
-    const workingDays = eachDayOfInterval(interval).filter(
-      day => !isSaturday(day) && !isSunday(day)
-    );
-
-    return workingDays.map((date, index) => {
-        const dateString = date.toISOString().split('T')[0];
+    return sprint.sprintDays.map((dayInfo) => {
+        const dateWithTimezone = new Date(dayInfo.date);
+        dateWithTimezone.setMinutes(dateWithTimezone.getMinutes() + dateWithTimezone.getTimezoneOffset());
         return {
-            value: dateString,
-            label: `Day ${index + 1} (${new Date(dateString).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})`,
+            value: dayInfo.date,
+            label: `D${dayInfo.day} (${dateWithTimezone.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
         }
     });
-  }, [sprint.startDate, sprint.endDate]);
+  }, [sprint.sprintDays]);
 
   const filteredTickets = React.useMemo(() => {
     if (!selectedScope) return []
@@ -347,5 +337,3 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
     </Dialog>
   )
 }
-
-    

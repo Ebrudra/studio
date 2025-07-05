@@ -1,7 +1,28 @@
 
 import type { Sprint, Team } from '@/types';
+import { eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
 
 export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android', 'Mobile'];
+
+const generateSprintDays = (startDateStr: string, endDateStr: string) => {
+    const days = [];
+    let currentDate = new Date(startDateStr);
+    // Add timezone offset to avoid off-by-one errors with date boundaries
+    currentDate.setMinutes(currentDate.getMinutes() + currentDate.getTimezoneOffset());
+    const endDate = new Date(endDateStr);
+    endDate.setMinutes(endDate.getMinutes() + endDate.getTimezoneOffset());
+    
+    let dayCounter = 1;
+    while (currentDate <= endDate) {
+        const dayOfWeek = currentDate.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Sunday=0, Saturday=6
+            days.push({ day: dayCounter++, date: currentDate.toISOString().split('T')[0] });
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return days;
+};
+
 
 export const sprints: Sprint[] = [
   {
@@ -9,6 +30,7 @@ export const sprints: Sprint[] = [
     name: 'Q3 Sprint 1 (July 8 - July 21)',
     startDate: '2024-07-08',
     endDate: '2024-07-21',
+    sprintDays: generateSprintDays('2024-07-08', '2024-07-21'),
     status: 'Active',
     lastUpdatedAt: new Date('2024-07-15T10:00:00Z').toISOString(),
     teamCapacity: {
@@ -33,13 +55,13 @@ export const sprints: Sprint[] = [
       { id: 'WIN-5939', title: 'Optimize image loading on Android', scope: 'Android', type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 5, status: 'Done', completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 5 }] },
       { id: 'WIN-5940', title: 'Fix CSS bug on marketing page', scope: 'Web', type: 'Bug', typeScope: 'Run', estimation: 3, timeLogged: 3, status: 'Done', completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 3 }] },
     ],
-    burnDownData: []
   },
   {
     id: 'sprint-2',
     name: 'Q3 Sprint 2 (July 22 - Aug 4)',
     startDate: '2024-07-22',
     endDate: '2024-08-04',
+    sprintDays: generateSprintDays('2024-07-22', '2024-08-04'),
     status: 'Active',
     lastUpdatedAt: new Date().toISOString(),
      teamCapacity: {
@@ -56,8 +78,5 @@ export const sprints: Sprint[] = [
       { id: 'WIN-6003', title: 'iOS 18 compatibility fixes', scope: 'iOS', type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 0, status: 'To Do', dailyLogs: [] },
       { id: 'WIN-6004', title: 'Improve Android app startup time', scope: 'Android', type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 0, status: 'To Do', dailyLogs: [] },
     ],
-    burnDownData: []
   },
 ];
-
-    

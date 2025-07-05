@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 
 interface BurnDownChartProps {
-  sprint: Sprint & { burnDownData: { day: number; date: string }[] }
+  sprint: Sprint
 }
 
 type ScopeFilter = "Total" | "Build" | "Run"
@@ -27,7 +27,7 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
   const teamsInSprint = useMemo(() => [ALL_TEAMS, ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
 
   const chartData = useMemo(() => {
-    const sprintDurationInDays = sprint.burnDownData.length;
+    const sprintDurationInDays = sprint.sprintDays.length;
     if (sprintDurationInDays === 0) return [];
 
     let filteredTickets = sprint.tickets
@@ -41,7 +41,7 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
       filteredTickets = filteredTickets.filter(t => t.typeScope !== 'Sprint')
     }
 
-    const sprintStartDate = sprint.burnDownData[0]?.date;
+    const sprintStartDate = sprint.sprintDays[0]?.date;
     if (!sprintStartDate) return [];
 
     const initialScope = filteredTickets
@@ -51,7 +51,7 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
     const idealBurnPerDay = initialScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1);
 
     const dailyDelta = new Map<string, { newScope: number; loggedHours: number }>();
-    sprint.burnDownData.forEach(day => {
+    sprint.sprintDays.forEach(day => {
         dailyDelta.set(day.date, { newScope: 0, loggedHours: 0 });
     });
     
@@ -75,13 +75,13 @@ export function BurnDownChart({ sprint }: BurnDownChartProps) {
 
     let cumulativeLogged = 0;
     let cumulativeNewScope = 0;
-    const processedData = sprint.burnDownData.map((dayData, index) => {
+    const processedData = sprint.sprintDays.map((dayData, index) => {
         const delta = dailyDelta.get(dayData.date) || { newScope: 0, loggedHours: 0 };
         cumulativeLogged += delta.loggedHours;
         
         // New scope is added to the total on the day it's created.
-        if (dayData.date > sprintStartDate) {
-            const scopeAddedYesterday = dailyDelta.get(sprint.burnDownData[index-1].date)?.newScope || 0;
+        if (index > 0) {
+            const scopeAddedYesterday = dailyDelta.get(sprint.sprintDays[index-1].date)?.newScope || 0;
             cumulativeNewScope += scopeAddedYesterday;
         }
 

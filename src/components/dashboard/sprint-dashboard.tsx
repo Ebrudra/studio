@@ -4,8 +4,8 @@
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
-import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity } from '@/types';
-import { eachDayOfInterval, isSaturday, isSunday } from "date-fns";
+import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
+import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -65,6 +65,7 @@ export default function SprintDashboard() {
       }
     } catch (error) {
         console.error("Failed to load sprints from localStorage", error);
+        setSprints(initialSprints); // Fallback to initial data on error
     } finally {
         setIsLoaded(true);
     }
@@ -121,43 +122,11 @@ export default function SprintDashboard() {
     const percentageComplete = totalScope > 0 ? (completedWork / totalScope) * 100 : 0;
     const summaryMetrics = { totalScope, completedWork, remainingWork, percentageComplete };
 
-    const startDate = new Date(selectedSprint.startDate);
-    const endDate = new Date(selectedSprint.endDate);
-    const sprintDays: { date: string, day: number }[] = [];
-    if (startDate && endDate && endDate >= startDate) {
-        const interval = { start: startDate, end: endDate };
-        const workingDays = eachDayOfInterval(interval).filter(
-            day => !isSaturday(day) && !isSunday(day)
-        );
-        workingDays.forEach((date, index) => {
-            sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
-        });
-    }
-    
-    // Create a shell burnDownData. The actual calculations are done in the BurnDownChart component.
-    const burnDownData = sprintDays.map((dayData) => ({
-        day: dayData.day,
-        date: dayData.date,
-    }));
-
-    return { ...selectedSprint, summaryMetrics, burnDownData, tickets, totalCapacity, buildCapacity, runCapacity };
+    return { ...selectedSprint, summaryMetrics, tickets, totalCapacity, buildCapacity, runCapacity };
   }, [selectedSprint]);
 
   const dailyProgressData = useMemo((): DailyProgressData[] => {
     if (!selectedSprint) return [];
-
-    const sprintDays: { date: string; day: number }[] = [];
-    const startDate = new Date(selectedSprint.startDate);
-    const endDate = new Date(selectedSprint.endDate);
-    if (startDate && endDate && endDate >= startDate) {
-        const interval = { start: startDate, end: endDate };
-        const workingDays = eachDayOfInterval(interval).filter(
-            day => !isSaturday(day) && !isSunday(day)
-        );
-        workingDays.forEach((date, index) => {
-            sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
-        });
-    }
     
     const dataByDate = new Map<string, Record<Team, { build: number; run: number; buffer: number }>>();
     
@@ -181,7 +150,7 @@ export default function SprintDashboard() {
         }
     }
 
-    return sprintDays.map(dayInfo => ({
+    return (selectedSprint.sprintDays || []).map(dayInfo => ({
         day: dayInfo.day,
         date: dayInfo.date,
         progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number; buffer: 0 }>)
@@ -191,9 +160,8 @@ export default function SprintDashboard() {
   const sprintWarnings = useMemo(() => {
     if (!processedSprint) return [];
     const warnings = [];
-    const today = new Date().toISOString().split('T')[0];
     
-    if ((processedSprint.totalCapacity || 0) > 0 && processedSprint.summaryMetrics.totalScope > (processedSprint.totalCapacity || 0)) {
+    if ((processedSprint.totalCapacity ?? 0) > 0 && processedSprint.summaryMetrics.totalScope > (processedSprint.totalCapacity ?? 0)) {
         warnings.push({
             title: "Scope Creep Alert",
             description: `Total scope (${processedSprint.summaryMetrics.totalScope.toFixed(1)}h) exceeds the sprint's capacity (${(processedSprint.totalCapacity || 0).toFixed(1)}h).`
@@ -233,13 +201,12 @@ export default function SprintDashboard() {
     }
   }
 
-  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData' | 'generatedReport'>) => {
+  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'generatedReport'>) => {
     const newSprint: Sprint = {
       ...newSprintData,
       id: `sprint-${sprints.length + 1}-${Date.now()}`,
       lastUpdatedAt: new Date().toISOString(),
       tickets: [],
-      burnDownData: [],
     };
     updateSprints(prevSprints => [...prevSprints, newSprint]);
     setSelectedSprintId(newSprint.id);
@@ -412,29 +379,13 @@ export default function SprintDashboard() {
     let newTicketsCount = 0;
 
     const updateFn = (prevSprints: Sprint[]) => {
-      // Deep copy to avoid mutation issues.
       const newSprints: Sprint[] = JSON.parse(JSON.stringify(prevSprints));
       const sprintToUpdate = newSprints.find(s => s.id === selectedSprintId);
       if (!sprintToUpdate) return prevSprints;
       
-      // Create a map of sprint days to dates
-      const sprintDays: { date: string; day: number }[] = [];
-      const startDate = new Date(sprintToUpdate.startDate);
-      const endDate = new Date(sprintToUpdate.endDate);
-      if (startDate && endDate && endDate >= startDate) {
-          const interval = { start: startDate, end: endDate };
-          const workingDays = eachDayOfInterval(interval).filter(
-              day => !isSaturday(day) && !isSunday(day)
-          );
-          workingDays.forEach((date, index) => {
-              sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
-          });
-      }
-      
       const dayToDateMap = new Map<number, string>();
-      sprintDays.forEach(d => dayToDateMap.set(d.day, d.date));
+      (sprintToUpdate.sprintDays || []).forEach(d => dayToDateMap.set(d.day, d.date));
       
-      // Sort logs by day number to process them chronologically
       logs.sort((a, b) => {
           const dayA = parseInt(a.day?.replace('D', '') || '0', 10);
           const dayB = parseInt(b.day?.replace('D', '') || '0', 10);
@@ -448,12 +399,11 @@ export default function SprintDashboard() {
         if (isNaN(dayNumber)) continue;
         
         const logDate = dayToDateMap.get(dayNumber);
-        if (!logDate) continue; // Skip if day is not a valid sprint working day
+        if (!logDate) continue;
 
         let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
 
         if (!ticket) {
-          // Create new ticket if it doesn't exist
           if (!log.title || !log.scope || !log.type) continue;
           
           let typeScope: TicketTypeScope = log.typeScope || 'Build';
@@ -469,8 +419,8 @@ export default function SprintDashboard() {
             type: log.type,
             typeScope: typeScope,
             estimation: estimation,
-            status: 'To Do', // Will be updated by the log's status
-            timeLogged: 0, // Will be recalculated later
+            status: 'To Do',
+            timeLogged: 0,
             dailyLogs: [],
             isOutOfScope: log.type === 'User story',
             creationDate: new Date(logDate).toISOString().split('T')[0],
@@ -479,12 +429,10 @@ export default function SprintDashboard() {
           newTicketsCount++;
         }
 
-        // Ensure dailyLogs array exists
         if (!ticket.dailyLogs) {
           ticket.dailyLogs = [];
         }
 
-        // Add or update the log for the specific date
         const newLog: DailyLog = { date: logDate, loggedHours: Number(log.loggedHours) || 0 };
         const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === logDate);
 
@@ -494,7 +442,6 @@ export default function SprintDashboard() {
           ticket.dailyLogs.push(newLog);
         }
 
-        // Update ticket status and completion date based on the latest log (since logs are sorted)
         ticket.status = log.status;
         const wasDone = !!ticket.completionDate;
         const isDone = log.status === 'Done';
@@ -508,7 +455,6 @@ export default function SprintDashboard() {
         processedCount++;
       }
       
-      // After all logs are processed, recalculate total timeLogged for all affected tickets
       sprintToUpdate.tickets.forEach((ticket: Ticket) => {
           if (ticket.dailyLogs) {
               ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
@@ -564,10 +510,8 @@ export default function SprintDashboard() {
                 if (!groupedByDay[log.date]) {
                     groupedByDay[log.date] = [];
                 }
-                // Augment ticket with the specific log for that day to show in table if needed
                 const ticketForDay = { ...ticket, dayLog: log };
                 
-                // Avoid duplicating tickets if they have multiple logs on the same day
                 if (!groupedByDay[log.date].some(t => t.id === ticket.id)) {
                     groupedByDay[log.date].push(ticketForDay);
                 }
@@ -575,7 +519,7 @@ export default function SprintDashboard() {
         });
 
         const flatData: any[] = [];
-        const sprintDayMap = new Map(processedSprint.burnDownData.map((d) => [d.date, `Day ${d.day}`]));
+        const sprintDayMap = new Map((processedSprint.sprintDays || []).map((d) => [d.date, `Day ${d.day}`]));
         const sortedDates = Object.keys(groupedByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
         sortedDates.forEach(date => {

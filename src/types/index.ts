@@ -24,15 +24,9 @@ export interface Ticket {
   isOutOfScope?: boolean;
 }
 
-export interface DailySprintData {
-  day: number;
-  date: string;
-  ideal: number;
-  actual: number;
-  completed: number;
-  dailyCompletedByTeam: Record<Team, number>;
-  dailyBuildByTeam: Record<Team, number>;
-  dailyRunByTeam: Record<Team, number>;
+export interface SprintDay {
+    day: number;
+    date: string; // YYYY-MM-DD
 }
 
 export interface TeamCapacity {
@@ -47,7 +41,7 @@ export interface Sprint {
   endDate: string;
   status: 'Active' | 'Completed';
   tickets: Ticket[];
-  burnDownData: DailySprintData[];
+  sprintDays: SprintDay[];
   lastUpdatedAt: string;
   teamCapacity: Record<Team, TeamCapacity>;
   totalCapacity?: number;
@@ -55,5 +49,3 @@ export interface Sprint {
   runCapacity?: number;
   generatedReport?: string;
 }
-
-    

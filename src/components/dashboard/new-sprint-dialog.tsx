@@ -5,7 +5,7 @@ import * as React from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { eachDayOfInterval, isSaturday, isSunday, addDays, nextWednesday, previousTuesday } from "date-fns"
+import { eachDayOfInterval, isSaturday, isSunday, addDays, nextWednesday, previousTuesday, format } from "date-fns"
 import { teams } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,13 +19,13 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { DatePicker } from "../ui/date-picker"
-import type { Sprint, Team, TeamCapacity } from "@/types"
+import type { Sprint, Team, TeamCapacity, SprintDay } from "@/types"
 import { useToast } from "@/hooks/use-toast"
 
 interface NewSprintDialogProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
-  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'burnDownData' | 'generatedReport'>) => void
+  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'generatedReport'>) => void
 }
 
 const formSchema = z.object({
@@ -33,7 +33,7 @@ const formSchema = z.object({
   startDate: z.date({ required_error: "Start date is required" }),
   endDate: z.date({ required_error: "End date is required" }),
   teamPersonDays: z.record(z.coerce.number().min(0, "Days must be non-negative").default(0)),
-}).refine(data => data.endDate > data.startDate, {
+}).refine(data => data.endDate >= data.startDate, {
   message: "End date must be after start date",
   path: ["endDate"],
 });
@@ -59,7 +59,6 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
         return;
     };
     
-    // Set default sprint dates to start next Wednesday and end the Tuesday after next.
     if(!startDate && !endDate) {
         const today = new Date();
         const nextWed = nextWednesday(today);
@@ -90,7 +89,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     teams.forEach(team => {
       const personDays = values.teamPersonDays[team as Team];
       const plannedBuild = personDays * 6;
-      const plannedRun = (personDays * 2) - 8; // 8h overhead from run hours
+      const plannedRun = (personDays * 2) - 8; 
 
       if (plannedRun < 0) {
         toast({
@@ -110,11 +109,23 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     
     const totalBuild = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedBuild, 0);
     const totalRun = Object.values(teamCapacity).reduce((acc, val) => acc + val.plannedRun, 0);
+    
+    const sprintDays: SprintDay[] = [];
+    if (values.startDate && values.endDate && values.endDate >= values.startDate) {
+        const interval = { start: values.startDate, end: values.endDate };
+        const workingDays = eachDayOfInterval(interval).filter(
+            day => !isSaturday(day) && !isSunday(day)
+        );
+        workingDays.forEach((date, index) => {
+            sprintDays.push({ day: index + 1, date: format(date, 'yyyy-MM-dd') });
+        });
+    }
 
     onCreateSprint({
       name: values.name,
       startDate: values.startDate.toISOString(),
       endDate: values.endDate.toISOString(),
+      sprintDays,
       status: 'Active',
       teamCapacity: teamCapacity,
       totalCapacity: totalBuild + totalRun,
@@ -204,5 +215,3 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     </Dialog>
   )
 }
-
-    
