@@ -435,12 +435,39 @@ export default function SprintDashboard() {
       const sprintToUpdate = newSprints.find(s => s.id === selectedSprintId);
       if (!sprintToUpdate) return prevSprints;
       
-      // Sort logs by date to process them chronologically
-      logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Create a map of sprint days to dates
+      const sprintDays: { date: string; day: number }[] = [];
+      const startDate = new Date(sprintToUpdate.startDate);
+      const endDate = new Date(sprintToUpdate.endDate);
+      if (startDate && endDate && endDate >= startDate) {
+          const interval = { start: startDate, end: endDate };
+          const workingDays = eachDayOfInterval(interval).filter(
+              day => !isSaturday(day) && !isSunday(day)
+          );
+          workingDays.forEach((date, index) => {
+              sprintDays.push({ date: date.toISOString().split('T')[0], day: index + 1 });
+          });
+      }
+      
+      const dayToDateMap = new Map<number, string>();
+      sprintDays.forEach(d => dayToDateMap.set(d.day, d.date));
+      
+      // Sort logs by day number to process them chronologically
+      logs.sort((a, b) => {
+          const dayA = parseInt(a.day?.replace('D', '') || '0', 10);
+          const dayB = parseInt(b.day?.replace('D', '') || '0', 10);
+          return dayA - dayB;
+      });
 
       for (const log of logs) {
-        if (!log.ticketId || !log.date || !log.loggedHours || !log.status) continue;
+        if (!log.ticketId || !log.day || !log.loggedHours || !log.status) continue;
         
+        const dayNumber = parseInt(log.day.replace('D', ''), 10);
+        if (isNaN(dayNumber)) continue;
+        
+        const logDate = dayToDateMap.get(dayNumber);
+        if (!logDate) continue; // Skip if day is not a valid sprint working day
+
         let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
 
         if (!ticket) {
@@ -464,7 +491,7 @@ export default function SprintDashboard() {
             timeLogged: 0, // Will be recalculated later
             dailyLogs: [],
             isOutOfScope: log.type === 'User story',
-            creationDate: new Date(log.date).toISOString().split('T')[0],
+            creationDate: new Date(logDate).toISOString().split('T')[0],
           };
           sprintToUpdate.tickets.push(ticket);
           newTicketsCount++;
@@ -476,8 +503,8 @@ export default function SprintDashboard() {
         }
 
         // Add or update the log for the specific date
-        const newLog: DailyLog = { date: log.date, loggedHours: Number(log.loggedHours) || 0 };
-        const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === log.date);
+        const newLog: DailyLog = { date: logDate, loggedHours: Number(log.loggedHours) || 0 };
+        const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === logDate);
 
         if (existingLogIndex > -1) {
           ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
@@ -491,7 +518,7 @@ export default function SprintDashboard() {
         const isDone = log.status === 'Done';
 
         if (!wasDone && isDone) {
-          ticket.completionDate = new Date(log.date).toISOString().split('T')[0];
+          ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
         } else if (wasDone && !isDone) {
           delete ticket.completionDate;
         }
