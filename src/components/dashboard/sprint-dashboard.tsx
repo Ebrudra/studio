@@ -60,7 +60,7 @@ export default function SprintDashboard() {
         setSprints(initialSprints);
       }
     } catch (error) {
-      console.error("Failed to load sprints from localStorage", error);
+        console.error("Failed to load sprints from localStorage", error);
     }
     setIsLoaded(true);
   }, []);
@@ -101,8 +101,8 @@ export default function SprintDashboard() {
         (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
 
-    const buildCapacity = Object.values(selectedSprint.teamCapacity).reduce((acc, team) => acc + team.plannedBuild, 0);
-    const runCapacity = Object.values(selectedSprint.teamCapacity).reduce((acc, team) => acc + team.plannedRun, 0);
+    const buildCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedBuild, 0);
+    const runCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedRun, 0);
     const totalCapacity = buildCapacity + runCapacity;
 
     const bdcTickets = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
@@ -731,5 +731,3 @@ export default function SprintDashboard() {
     </div>
   );
 }
-
-    
