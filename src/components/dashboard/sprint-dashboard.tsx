@@ -429,73 +429,90 @@ export default function SprintDashboard() {
     let processedCount = 0;
     let newTicketsCount = 0;
 
-    logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
     const updateFn = (prevSprints: Sprint[]) => {
-        return prevSprints.map(sprint => {
-            if (sprint.id !== selectedSprintId) return sprint;
+      // Deep copy to avoid mutation issues.
+      const newSprints: Sprint[] = JSON.parse(JSON.stringify(prevSprints));
+      const sprintToUpdate = newSprints.find(s => s.id === selectedSprintId);
+      if (!sprintToUpdate) return prevSprints;
+      
+      // Sort logs by date to process them chronologically
+      logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-            const ticketsMap = new Map(sprint.tickets.map(t => [t.id, { ...t, dailyLogs: [...(t.dailyLogs || [])] }]));
+      for (const log of logs) {
+        if (!log.ticketId || !log.date || !log.loggedHours || !log.status) continue;
+        
+        let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
 
-            for (const log of logs) {
-                if (!log.ticketId || !log.date || !log.loggedHours || !log.status) continue;
-                
-                let ticket = ticketsMap.get(log.ticketId);
+        if (!ticket) {
+          // Create new ticket if it doesn't exist
+          if (!log.title || !log.scope || !log.type) continue;
+          
+          let typeScope: TicketTypeScope = log.typeScope || 'Build';
+          if (log.type === 'Bug') typeScope = 'Run';
+          else if (log.type === 'Buffer') typeScope = 'Sprint';
+          
+          const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
 
-                if (!ticket) {
-                    if (!log.title || !log.scope || !log.type) continue;
-                    
-                    let typeScope: TicketTypeScope = log.typeScope || 'Build';
-                    if (log.type === 'Bug') typeScope = 'Run';
-                    else if (log.type === 'Buffer') typeScope = 'Sprint';
-                    
-                    const estimation = Number(log.estimation) || ( (log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
+          ticket = {
+            id: log.ticketId,
+            title: log.title,
+            scope: log.scope,
+            type: log.type,
+            typeScope: typeScope,
+            estimation: estimation,
+            status: 'To Do', // Will be updated by the log's status
+            timeLogged: 0, // Will be recalculated later
+            dailyLogs: [],
+            isOutOfScope: log.type === 'User story',
+            creationDate: new Date(log.date).toISOString().split('T')[0],
+          };
+          sprintToUpdate.tickets.push(ticket);
+          newTicketsCount++;
+        }
 
-                    ticket = {
-                        id: log.ticketId,
-                        title: log.title,
-                        scope: log.scope,
-                        type: log.type,
-                        typeScope: typeScope,
-                        estimation: estimation,
-                        status: log.status,
-                        timeLogged: 0,
-                        dailyLogs: [],
-                        isOutOfScope: log.type === 'User story',
-                        creationDate: new Date(log.date).toISOString().split('T')[0],
-                    };
-                    newTicketsCount++;
-                }
+        // Ensure dailyLogs array exists
+        if (!ticket.dailyLogs) {
+          ticket.dailyLogs = [];
+        }
 
-                const newLog: DailyLog = { date: log.date, loggedHours: Number(log.loggedHours) || 0 };
-                const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === log.date);
+        // Add or update the log for the specific date
+        const newLog: DailyLog = { date: log.date, loggedHours: Number(log.loggedHours) || 0 };
+        const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === log.date);
 
-                if (existingLogIndex !== -1) {
-                    ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
-                } else {
-                    ticket.dailyLogs.push(newLog);
-                }
-                
-                ticket.dailyLogs.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        if (existingLogIndex > -1) {
+          ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
+        } else {
+          ticket.dailyLogs.push(newLog);
+        }
 
-                ticket.status = log.status; // status is based on latest log for that ticket
-                ticket.timeLogged = ticket.dailyLogs.reduce((acc, l) => acc + l.loggedHours, 0);
+        // Update ticket status and completion date based on the latest log (since logs are sorted)
+        ticket.status = log.status;
+        const wasDone = !!ticket.completionDate;
+        const isDone = log.status === 'Done';
 
-                const wasDone = !!ticket.completionDate;
-                const isDone = log.status === 'Done';
-                if (!wasDone && isDone) ticket.completionDate = new Date(log.date).toISOString().split('T')[0];
-                else if (wasDone && !isDone) delete ticket.completionDate;
-                
-                ticketsMap.set(log.ticketId, ticket);
-                processedCount++;
-            }
+        if (!wasDone && isDone) {
+          ticket.completionDate = new Date(log.date).toISOString().split('T')[0];
+        } else if (wasDone && !isDone) {
+          delete ticket.completionDate;
+        }
 
-            return { ...sprint, tickets: Array.from(ticketsMap.values()), lastUpdatedAt: new Date().toISOString() };
-        });
+        processedCount++;
+      }
+      
+      // After all logs are processed, recalculate total timeLogged for all affected tickets
+      sprintToUpdate.tickets.forEach((ticket: Ticket) => {
+          if (ticket.dailyLogs) {
+              ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
+          }
+      });
+
+      sprintToUpdate.lastUpdatedAt = new Date().toISOString();
+      return newSprints;
     };
+    
     handleBulkUpdate(updateFn, {
-        title: "Progress Log Upload Complete",
-        description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
+      title: "Progress Log Upload Complete",
+      description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
     });
   };
   
@@ -681,7 +698,7 @@ export default function SprintDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+              <TaskTable columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={onDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
           </CardContent>
        </Card>
 
