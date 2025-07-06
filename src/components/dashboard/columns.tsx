@@ -9,6 +9,7 @@ import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
 import { Ticket, TicketStatus, TicketTypeScope } from "@/types"
 import { statuses } from "./data"
+import { cn } from "@/lib/utils"
 
 export const columns: ColumnDef<Ticket>[] = [
   {
@@ -66,15 +67,21 @@ export const columns: ColumnDef<Ticket>[] = [
       const status = statuses.find(s => s.value === row.getValue("status"));
       if (!status) return null;
 
-      const variantMap: Record<TicketStatus, "default" | "secondary" | "destructive" | "success"> = {
+      const statusValue = row.getValue("status") as TicketStatus;
+
+      const variantMap: Record<TicketStatus, "default" | "secondary" | "destructive" | "success" | "outline"> = {
           "To Do": "secondary",
-          "In Progress": "default",
+          "In Progress": "outline",
           "Done": "success",
           "Blocked": "destructive",
       };
 
+      const classesMap: Partial<Record<TicketStatus, string>> = {
+          "In Progress": "bg-primary/10 text-primary border-transparent hover:bg-primary/20",
+      };
+
       return (
-        <Badge variant={variantMap[status.value]} className="w-[110px] flex justify-start">
+        <Badge variant={variantMap[statusValue]} className={cn("w-[110px] flex justify-start", classesMap[statusValue])}>
             {status.icon && <status.icon className="mr-2 h-4 w-4" />}
             <span>{status.label}</span>
         </Badge>

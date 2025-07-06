@@ -1,9 +1,9 @@
 import type { TicketStatus, TicketTypeScope, Team, TicketType } from "@/types"
-import { CheckCircle2, Circle, CircleDot, XCircle } from "lucide-react"
+import { CheckCircle2, Circle, Play, XCircle } from "lucide-react"
 
 export const statuses: { value: TicketStatus; label: string; icon: React.ElementType }[] = [
   { value: "To Do", label: "To Do", icon: Circle },
-  { value: "In Progress", label: "In Progress", icon: CircleDot },
+  { value: "In Progress", label: "In Progress", icon: Play },
   { value: "Done", label: "Done", icon: CheckCircle2 },
   { value: "Blocked", label: "Blocked", icon: XCircle },
 ]
