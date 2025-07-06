@@ -143,7 +143,7 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Scope (Team)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
                       </FormControl>
@@ -161,7 +161,7 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger>
                       </FormControl>
@@ -181,7 +181,7 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
                       </FormControl>
@@ -199,7 +199,7 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type Scope</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a type scope" /></SelectTrigger>
                       </FormControl>

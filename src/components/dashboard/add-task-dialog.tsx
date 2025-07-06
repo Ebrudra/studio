@@ -43,6 +43,9 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
       title: "",
       estimation: 0,
       status: "To Do",
+      scope: undefined,
+      type: undefined,
+      typeScope: undefined,
     },
   })
 
@@ -128,7 +131,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Scope (Team)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
                       </FormControl>
@@ -146,7 +149,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger>
                       </FormControl>
@@ -166,7 +169,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
                       </FormControl>
@@ -184,7 +187,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type Scope</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select a type scope" /></SelectTrigger>
                       </FormControl>

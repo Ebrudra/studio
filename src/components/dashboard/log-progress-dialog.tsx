@@ -51,13 +51,20 @@ const formSchema = z.object({
     path: ["newTicketId"],
 });
 
+const defaultLogProgressValues: Partial<LogProgressData> = {
+    newTicketId: "",
+    newTicketTitle: "",
+    estimation: 0,
+    loggedHours: 0,
+    type: "Task",
+    typeScope: "Build",
+    status: "To Do",
+};
 
 export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, taskToLog, onClose }: LogProgressDialogProps) {
   const form = useForm<LogProgressData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      loggedHours: 0,
-    },
+    defaultValues: defaultLogProgressValues
   })
 
   const { watch, setValue, reset, control, formState: { touchedFields } } = form
@@ -87,17 +94,22 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   }, [sprint.tickets, selectedScope])
 
   React.useEffect(() => {
-    if (taskToLog) {
-        setValue("scope", taskToLog.scope);
-        setValue("ticketId", taskToLog.id);
-        setValue("type", taskToLog.type);
-        setValue("typeScope", taskToLog.typeScope);
-        setValue("estimation", taskToLog.estimation);
-        setValue("status", taskToLog.status);
-    } else {
-        reset({loggedHours: 0});
+    if (isOpen) {
+        if (taskToLog) {
+            reset({
+                ...defaultLogProgressValues,
+                scope: taskToLog.scope,
+                ticketId: taskToLog.id,
+                type: taskToLog.type,
+                typeScope: taskToLog.typeScope,
+                estimation: taskToLog.estimation,
+                status: taskToLog.status,
+            });
+        } else {
+            reset(defaultLogProgressValues);
+        }
     }
-  }, [taskToLog, setValue, reset])
+  }, [isOpen, taskToLog, reset]);
 
   React.useEffect(() => {
     if (selectedTicketId && selectedTicketId !== 'new-ticket') {
@@ -137,7 +149,6 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   const handleClose = () => {
     setIsOpen(false);
     onClose();
-    reset({loggedHours: 0});
   }
 
   const onSubmit = (values: LogProgressData) => {
@@ -270,7 +281,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Day</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a day" /></SelectTrigger>
                         </FormControl>

@@ -44,6 +44,8 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      startDate: undefined,
+      endDate: undefined,
       teamPersonDays: teams.reduce((acc, team) => ({ ...acc, [team]: 0 }), {} as Record<Team, number>),
     },
   })
