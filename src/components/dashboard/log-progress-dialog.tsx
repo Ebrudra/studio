@@ -61,6 +61,14 @@ const defaultLogProgressValues: Partial<LogProgressData> = {
     status: "To Do",
 };
 
+// Helper function to find the canonical team name from the scopes list
+const findCanonicalTeam = (teamName: string | undefined): Team | undefined => {
+    if (!teamName) return undefined;
+    const team = scopes.find(s => s.value.toLowerCase() === teamName.toLowerCase());
+    return team ? team.value : undefined;
+};
+
+
 export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, taskToLog, onClose }: LogProgressDialogProps) {
   const form = useForm<LogProgressData>({
     resolver: zodResolver(formSchema),
@@ -90,7 +98,8 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
 
   const filteredTickets = React.useMemo(() => {
     if (!selectedScope) return []
-    return sprint.tickets.filter(t => t.scope === selectedScope)
+    const canonicalScope = findCanonicalTeam(selectedScope);
+    return sprint.tickets.filter(t => findCanonicalTeam(t.scope) === canonicalScope)
   }, [sprint.tickets, selectedScope])
 
   React.useEffect(() => {
@@ -98,7 +107,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
         if (taskToLog) {
             reset({
                 ...defaultLogProgressValues,
-                scope: taskToLog.scope,
+                scope: findCanonicalTeam(taskToLog.scope),
                 ticketId: taskToLog.id,
                 type: taskToLog.type,
                 typeScope: taskToLog.typeScope,
@@ -115,16 +124,19 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
     if (selectedTicketId && selectedTicketId !== 'new-ticket') {
       const ticket = sprint.tickets.find(t => t.id === selectedTicketId)
       if (ticket) {
-        setValue("type", ticket.type)
-        setValue("typeScope", ticket.typeScope)
-        setValue("estimation", ticket.estimation)
-        setValue("status", ticket.status)
+        // When selecting an existing ticket, we don't want to change the type/scope,
+        // so we just update the form state.
+        setValue("type", ticket.type, { shouldValidate: true })
+        setValue("typeScope", ticket.typeScope, { shouldValidate: true })
+        setValue("estimation", ticket.estimation, { shouldValidate: true })
+        setValue("status", ticket.status, { shouldValidate: true })
       }
     } else if (isNewTicket) {
-        setValue("type", ticketTypes[0].value)
-        setValue("typeScope", typeScopes[0].value)
+        // When creating a new ticket, reset to defaults.
+        setValue("type", "Task")
+        setValue("typeScope", "Build")
         setValue("estimation", 0)
-        setValue("status", statuses[0].value)
+        setValue("status", "To Do")
     }
   }, [selectedTicketId, sprint.tickets, setValue, isNewTicket])
   
