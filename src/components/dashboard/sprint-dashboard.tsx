@@ -10,13 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TaskTable } from './task-table';
-import { BurnDownChart } from './burn-down-chart';
-import { ScopeDistributionChart } from './scope-distribution-chart';
-import { WorkDistributionChart } from './work-distribution-chart';
+import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -179,6 +177,43 @@ export default function SprintDashboard() {
 
     return warnings;
   }, [processedSprint]);
+
+  const analyticsMetrics = React.useMemo(() => {
+    if (!processedSprint || !sprints.length) {
+        return {
+            currentVelocity: 0,
+            velocityTrend: 'down',
+            velocityChange: 0,
+            teamEfficiency: 0
+        };
+    }
+    const completedSprints = sprints.filter(s => s.status === 'Completed').sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    
+    const calculateVelocity = (sprint: Sprint) => {
+        const completedBuild = sprint.tickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
+        const duration = sprint.sprintDays?.length || 1;
+        return completedBuild / duration;
+    }
+
+    const currentVelocity = calculateVelocity(processedSprint);
+    
+    const lastCompletedSprint = completedSprints.length > 0 ? completedSprints[completedSprints.length - 1] : null;
+    const previousVelocity = lastCompletedSprint ? calculateVelocity(lastCompletedSprint) : 0;
+    
+    const velocityTrend = currentVelocity > previousVelocity ? 'up' : 'down';
+    const velocityChange = previousVelocity > 0 ? Math.abs(((currentVelocity - previousVelocity) / previousVelocity) * 100) : 0;
+    
+    const totalPlanned = (processedSprint.buildCapacity || 0) + (processedSprint.runCapacity || 0);
+    const totalCompleted = processedSprint.tickets.filter(t=>t.status==='Done').reduce((acc, t) => acc + t.estimation, 0);
+    const teamEfficiency = totalPlanned > 0 ? (totalCompleted / totalPlanned) * 100 : 0;
+
+    return {
+        currentVelocity: parseFloat(currentVelocity.toFixed(1)),
+        velocityTrend,
+        velocityChange: parseFloat(velocityChange.toFixed(1)),
+        teamEfficiency: parseFloat(teamEfficiency.toFixed(1)),
+    }
+  }, [processedSprint, sprints]);
   
   const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
     setSprints(currentSprints => {
@@ -663,58 +698,61 @@ export default function SprintDashboard() {
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Scope</CardTitle>
-            <div className="flex items-center gap-2">
-                <InsightBulb insight="This is the total estimated effort for all 'Build' and 'Run' tasks in the sprint. It increases if new bugs are found or out-of-scope work is added." />
-                <GitCommitHorizontal className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.totalScope.toFixed(1)}h</div>
-            <p className="text-xs text-muted-foreground">Of {(processedSprint.totalCapacity || 0).toFixed(1)}h capacity</p>
-          </CardContent>
+            <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                <div>
+                    <div className="text-2xl font-bold">{analyticsMetrics.currentVelocity}</div>
+                    <div className="text-xs text-muted-foreground">Current Velocity</div>
+                </div>
+                <div className="flex items-center gap-1">
+                    {analyticsMetrics.velocityTrend === "up" ? (
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    ) : (
+                    <TrendingDown className="w-4 h-4 text-red-500" />
+                    )}
+                    <span className={`text-xs ${analyticsMetrics.velocityTrend === "up" ? "text-green-500" : "text-red-500"}`}>
+                    {analyticsMetrics.velocityChange}%
+                    </span>
+                </div>
+                </div>
+            </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Work Completed</CardTitle>
-             <div className="flex items-center gap-2">
-                <InsightBulb insight="Represents the total estimation of all tasks marked as 'Done'." />
-                <CheckCircle className="h-4 w-4 text-green-500" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.completedWork.toFixed(1)}h</div>
-            <p className="text-xs text-muted-foreground">Of {processedSprint.summaryMetrics.totalScope.toFixed(1)}h total</p>
-          </CardContent>
+            <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-500" />
+                <div>
+                    <div className="text-2xl font-bold">{processedSprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground">Sprint Progress</div>
+                </div>
+                </div>
+            </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Work Remaining</CardTitle>
-             <div className="flex items-center gap-2">
-                <InsightBulb insight="The amount of estimated work left to be completed in the sprint." />
-                <ListTodo className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
-            <p className="text-xs text-muted-foreground">To be completed</p>
-          </CardContent>
+            <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-orange-500" />
+                <div>
+                    <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
+                    <div className="text-xs text-muted-foreground">Remaining Work</div>
+                </div>
+                </div>
+            </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Percentage Complete</CardTitle>
-             <div className="flex items-center gap-2">
-                <InsightBulb insight="The percentage of completed work against the total scope." />
-                <Zap className="h-4 w-4 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{processedSprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">Sprint progress</p>
-          </CardContent>
+            <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-500" />
+                <div>
+                    <div className="text-2xl font-bold">{analyticsMetrics.teamEfficiency}%</div>
+                    <div className="text-xs text-muted-foreground">Team Efficiency</div>
+                </div>
+                </div>
+            </CardContent>
         </Card>
       </section>
+
+      <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
       
       <Card>
             <CardHeader>
@@ -749,40 +787,6 @@ export default function SprintDashboard() {
               <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
           </CardContent>
        </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3 space-y-6">
-           <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <CardTitle>Sprint Burn-down</CardTitle>
-                    <InsightBulb insight="This chart tracks remaining work vs. ideal progress. If the blue line ('Actual Burn') is above the gray dotted line ('Ideal Burn'), the team is behind schedule." />
-                </div>
-            </CardHeader>
-            <CardContent><BurnDownChart sprint={processedSprint} /></CardContent>
-           </Card>
-        </div>
-        <div className="lg:col-span-2 space-y-6">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <CardTitle>Scope Distribution</CardTitle>
-                        <InsightBulb insight="How the total estimated work (scope) is divided between Build, Run, and Sprint tasks." />
-                    </div>
-                </CardHeader>
-                <CardContent><ScopeDistributionChart tickets={processedSprint.tickets} /></CardContent>
-            </Card>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <CardTitle>Work Distribution</CardTitle>
-                        <InsightBulb insight="How the actual logged hours are divided. This shows where the team's effort is really going." />
-                    </div>
-                </CardHeader>
-                <CardContent><WorkDistributionChart tickets={processedSprint.tickets} /></CardContent>
-            </Card>
-        </div>
-      </div>
       
        <div className="grid grid-cols-1 gap-6">
           <TeamCapacityTable sprint={processedSprint} />
