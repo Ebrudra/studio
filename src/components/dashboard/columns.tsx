@@ -16,11 +16,29 @@ export const columns: ColumnDef<Ticket>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Ticket" />
     ),
-    cell: ({ row }) => <div className="w-[80px]">
-        <a href={`https://inwidtd.atlassian.net/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-            {row.getValue("id")}
-        </a>
-    </div>,
+    cell: ({ row }) => {
+        const ticket = row.original;
+        const isOverEstimation = ticket.timeLogged > ticket.estimation && ticket.estimation > 0;
+        return (
+            <div className="flex items-center gap-2 w-[100px]">
+                {isOverEstimation && (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger>
+                               <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Logged time has exceeded estimation.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+                <a href={`https://inwidtd.atlassian.net/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {row.getValue("id")}
+                </a>
+            </div>
+        )
+    },
     enableSorting: false,
     enableHiding: false,
   },
@@ -30,22 +48,8 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Title" />
     ),
     cell: ({ row }) => {
-      const ticket = row.original
-      const isOverEstimation = ticket.timeLogged > ticket.estimation && ticket.estimation > 0
       return (
         <div className="flex space-x-2 items-center">
-            {isOverEstimation && (
-                 <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger>
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Logged time has exceeded estimation.</p>
-                        </TooltipContent>
-                    </Tooltip>
-                 </TooltipProvider>
-            )}
           <span className="max-w-[350px] truncate font-medium">
             {row.getValue("title")}
           </span>
@@ -76,9 +80,6 @@ export const columns: ColumnDef<Ticket>[] = [
         </Badge>
       )
     },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
   },
   {
     accessorKey: "scope",
@@ -91,9 +92,6 @@ export const columns: ColumnDef<Ticket>[] = [
           <span>{row.getValue("scope")}</span>
         </div>
       )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
     },
   },
   {
@@ -120,9 +118,6 @@ export const columns: ColumnDef<Ticket>[] = [
           </Badge>
         </div>
       )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
     },
   },
    {

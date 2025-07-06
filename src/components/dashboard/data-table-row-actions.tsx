@@ -2,17 +2,17 @@
 "use client"
 
 import { Row } from "@tanstack/react-table"
-import { Clock, Pencil, Trash2 } from "lucide-react"
+import { Clock, Edit, MoreHorizontal, Trash2 } from "lucide-react"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Ticket } from "@/types"
 import { EditTaskDialog } from "./edit-task-dialog"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>
@@ -39,48 +39,36 @@ export function DataTableRowActions<TData>({
   }
 
   return (
-    <TooltipProvider delayDuration={100}>
-        <div className="flex items-center space-x-1">
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => onLogTime(task)} disabled={isSprintCompleted}>
-                        <Clock className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Log Time</p>
-                </TooltipContent>
-            </Tooltip>
-             <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={() => setIsEditDialogOpen(true)} disabled={isSprintCompleted}>
-                        <Pencil className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Edit Task</p>
-                </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive" disabled={isSprintCompleted}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Delete Task</p>
-                </TooltipContent>
-            </Tooltip>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onLogTime(task)} disabled={isSprintCompleted}>
+            <Clock className="w-4 h-4 mr-2" />
+            Log Time
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)} disabled={isSprintCompleted}>
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleDelete} className="text-destructive" disabled={isSprintCompleted}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-            <EditTaskDialog
-                isOpen={isEditDialogOpen}
-                setIsOpen={setIsEditDialogOpen}
-                task={task}
-                onUpdateTask={onUpdateTask}
-            />
-        </div>
-    </TooltipProvider>
+      <EditTaskDialog
+          isOpen={isEditDialogOpen}
+          setIsOpen={setIsEditDialogOpen}
+          task={task}
+          onUpdateTask={onUpdateTask}
+      />
+    </>
   )
 }
-
-    

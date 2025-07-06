@@ -2,16 +2,15 @@
 "use client"
 
 import { Table } from "@tanstack/react-table"
-import { X } from "lucide-react"
+import { Filter, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DataTableViewOptions } from "./data-table-view-options"
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { statuses, scopes, typeScopes } from "./data"
-import { DataTableFacetedFilter } from "./data-table-faceted-filter"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>,
@@ -39,27 +38,43 @@ export function DataTableToolbar<TData>({
         />
         {viewMode === 'list' && (
             <>
-                {table.getColumn("status") && (
-                <DataTableFacetedFilter
-                    column={table.getColumn("status")}
-                    title="Status"
-                    options={statuses}
-                />
-                )}
-                {table.getColumn("scope") && (
-                <DataTableFacetedFilter
-                    column={table.getColumn("scope")}
-                    title="Scope"
-                    options={scopes}
-                />
-                )}
-                {table.getColumn("typeScope") && (
-                <DataTableFacetedFilter
-                    column={table.getColumn("typeScope")}
-                    title="Type Scope"
-                    options={typeScopes}
-                />
-                )}
+                <Select
+                    value={(table.getColumn("status")?.getFilterValue() as string) ?? "all"}
+                    onValueChange={(value) => table.getColumn("status")?.setFilterValue(value === "all" ? null : value)}
+                >
+                    <SelectTrigger className="w-40 h-8">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        {statuses.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <Select
+                    value={(table.getColumn("scope")?.getFilterValue() as string) ?? "all"}
+                    onValueChange={(value) => table.getColumn("scope")?.setFilterValue(value === "all" ? null : value)}
+                >
+                    <SelectTrigger className="w-40 h-8">
+                        <SelectValue placeholder="Scope" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Scopes</SelectItem>
+                        {scopes.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                 <Select
+                    value={(table.getColumn("typeScope")?.getFilterValue() as string) ?? "all"}
+                    onValueChange={(value) => table.getColumn("typeScope")?.setFilterValue(value === "all" ? null : value)}
+                >
+                    <SelectTrigger className="w-40 h-8">
+                        <SelectValue placeholder="Type Scope" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Type Scopes</SelectItem>
+                        {typeScopes.map(ts => <SelectItem key={ts.value} value={ts.value}>{ts.label}</SelectItem>)}
+                    </SelectContent>
+                </Select>
                 {isFiltered && (
                 <Button
                     variant="ghost"

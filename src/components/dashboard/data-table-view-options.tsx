@@ -1,7 +1,8 @@
+
 "use client"
 
 import { DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu"
-import { SlidersHorizontal } from "lucide-react"
+import { MoreHorizontal } from "lucide-react"
 import { Table } from "@tanstack/react-table"
 
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,7 @@ export function DataTableViewOptions<TData>({
           size="sm"
           className="ml-auto hidden h-8 lg:flex"
         >
-          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          <MoreHorizontal className="mr-2 h-4 w-4" />
           View
         </Button>
       </DropdownMenuTrigger>

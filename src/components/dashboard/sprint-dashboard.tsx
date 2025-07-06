@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -15,7 +16,7 @@ import { WorkDistributionChart } from './work-distribution-chart';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, PlusCircle, BotMessageSquare, Zap, NotebookPen, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -220,8 +221,18 @@ export default function SprintDashboard() {
     toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
   };
 
-  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
-    const newTask: Ticket = { ...newTaskData, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
+  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged" | "title"> & { title?: string }) => {
+    const taskWithTitle = { ...newTaskData, title: newTaskData.title || newTaskData.id };
+    const newTask: Ticket = { ...taskWithTitle, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
+    
+    if (newTask.type === 'Bug') {
+        newTask.typeScope = 'Run';
+    } else if (newTask.type === 'Buffer') {
+        newTask.typeScope = 'Sprint';
+    } else {
+        newTask.typeScope = 'Build';
+    }
+
     updateSprints(prevSprints =>
       prevSprints.map(sprint =>
         sprint.id === selectedSprintId
@@ -236,7 +247,18 @@ export default function SprintDashboard() {
       prevSprints.map(sprint => {
         if (sprint.id !== selectedSprintId) return sprint;
         
-        let finalTask = { ...updatedTask };
+        let finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
+
+        if (finalTask.type === 'Bug') {
+            finalTask.typeScope = 'Run';
+        } else if (finalTask.type === 'Buffer') {
+            finalTask.typeScope = 'Sprint';
+        } else if (finalTask.type !== 'User story' && finalTask.scope === 'Out of Scope') {
+            finalTask.typeScope = 'Build';
+        } else if (finalTask.type === 'User story') {
+            finalTask.typeScope = 'Build';
+        }
+
         if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
           finalTask.estimation = finalTask.timeLogged;
         }
@@ -371,8 +393,8 @@ export default function SprintDashboard() {
         let typeScope: TicketTypeScope = 'Build';
         if (task.type === 'Bug') typeScope = 'Run';
         else if (task.type === 'Buffer') typeScope = 'Sprint';
-        else if (task.type === 'User story') typeScope = 'Build';
-        
+        else if (task.scope === 'Out of Scope') typeScope = 'Build';
+
         const canonicalScope = teams.find(t => t.toLowerCase() === task.scope.toLowerCase()) || 'Out of Scope';
         const estimation = Number(task.estimation) || 0;
 
@@ -447,7 +469,7 @@ export default function SprintDashboard() {
             status: 'To Do',
             timeLogged: 0,
             dailyLogs: [],
-            isOutOfScope: log.type === 'User story',
+            isOutOfScope: log.scope === 'Out of Scope',
             creationDate: new Date(logDate).toISOString().split('T')[0],
           };
           sprintToUpdate.tickets.push(ticket);
@@ -602,7 +624,7 @@ export default function SprintDashboard() {
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 flex flex-col items-center justify-center h-screen">
             <p className="text-muted-foreground mb-4">No sprint selected or available.</p>
             <Button onClick={() => setIsNewSprintOpen(true)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" />
                 Start a New Sprint
             </Button>
             <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
@@ -640,7 +662,7 @@ export default function SprintDashboard() {
                     </SelectContent>
                 </Select>
             </div>
-             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><PlusCircle className="mr-2 h-4 w-4" />New Sprint</Button>
+             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><Plus className="mr-2 h-4 w-4" />New Sprint</Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon"><Settings className="h-4 w-4" /></Button>
@@ -729,19 +751,34 @@ export default function SprintDashboard() {
       </section>
       
       <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CardTitle>Sprint Tasks</CardTitle>
-                <InsightBulb insight="This table lists all tasks in the sprint. Use the actions on the right to log time, edit, or delete tasks." />
-              </div>
-               <div className="flex items-center gap-2">
-                {previousSprints && <Button onClick={handleRollback} variant="destructive"><History className="mr-2 h-4 w-4" /> Rollback Import</Button>}
-                <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" disabled={isSprintCompleted}><Upload className="mr-2 h-4 w-4" /> Bulk Upload</Button>
-                <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} disabled={isSprintCompleted}><NotebookPen className="mr-2 h-4 w-4" /> Log Progress</Button>
-                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" disabled={isSprintCompleted}><PlusCircle className="mr-2 h-4 w-4" /> Add Task</Button>
-                <Button onClick={() => setIsReportOpen(true)} variant="outline" disabled={!processedSprint.tickets.length}><BotMessageSquare className="mr-2 h-4 w-4" /> {selectedSprint.generatedReport ? "View Report" : "Generate Report"}</Button>
-            </div>
-          </CardHeader>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                    Sprint Tasks
+                    <Badge variant="outline">{processedSprint.tickets.length}</Badge>
+                </CardTitle>
+
+                <div className="flex items-center gap-2">
+                    {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
+                    <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Bulk Upload
+                    </Button>
+                    <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Log Progress
+                    </Button>
+                    <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Task
+                    </Button>
+                    <Button onClick={() => setIsReportOpen(true)} variant="outline" size="sm" disabled={!processedSprint.tickets.length}>
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        {selectedSprint.generatedReport ? "View Report" : "Generate Report"}
+                    </Button>
+                </div>
+                </div>
+            </CardHeader>
           <CardContent>
               <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
           </CardContent>
