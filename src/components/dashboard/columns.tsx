@@ -69,15 +69,17 @@ export const columns: ColumnDef<Ticket>[] = [
 
       const statusValue = row.getValue("status") as TicketStatus;
 
-      const variantMap: Record<TicketStatus, "default" | "secondary" | "destructive" | "success" | "outline"> = {
+      const variantMap: Record<TicketStatus, "secondary" | "outline"> = {
           "To Do": "secondary",
-          "In Progress": "outline",
-          "Done": "success",
-          "Blocked": "destructive",
+          "Doing": "outline",
+          "Done": "outline",
+          "Blocked": "outline",
       };
 
       const classesMap: Partial<Record<TicketStatus, string>> = {
-          "In Progress": "bg-primary/10 text-primary border-transparent hover:bg-primary/20",
+          "Doing": "bg-primary/10 text-primary border-transparent hover:bg-primary/20",
+          "Done": "bg-success/10 text-success border-transparent hover:bg-success/20",
+          "Blocked": "bg-destructive/10 text-destructive border-transparent hover:bg-destructive/20",
       };
 
       return (

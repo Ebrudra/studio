@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, Play, XCircle } from "lucide-react"
 
 export const statuses: { value: TicketStatus; label: string; icon: React.ElementType }[] = [
   { value: "To Do", label: "To Do", icon: Circle },
-  { value: "In Progress", label: "In Progress", icon: Play },
+  { value: "Doing", label: "Doing", icon: Play },
   { value: "Done", label: "Done", icon: CheckCircle2 },
   { value: "Blocked", label: "Blocked", icon: XCircle },
 ]
