@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -102,7 +101,7 @@ export default function SprintDashboard() {
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    // Ensure bug estimations are always equal to their logged time
+    // NOTE: This ensures display is always correct, but the underlying data is mutated in handlers
     const tickets = selectedSprint.tickets.map(ticket => 
         (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
@@ -236,7 +235,13 @@ export default function SprintDashboard() {
     updateSprints(prevSprints =>
       prevSprints.map(sprint => {
         if (sprint.id !== selectedSprintId) return sprint;
-        const newTickets = sprint.tickets.map(t => (t.id === updatedTask.id) ? updatedTask : t);
+        
+        let finalTask = { ...updatedTask };
+        if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
+          finalTask.estimation = finalTask.timeLogged;
+        }
+
+        const newTickets = sprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
         return { ...sprint, tickets: newTickets, lastUpdatedAt: new Date().toISOString() };
       })
     );
@@ -288,16 +293,20 @@ export default function SprintDashboard() {
         const isNewTicket = data.ticketId === 'new-ticket';
         const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
         let ticket = newTickets.find(t => t.id === ticketId);
+        
+        const dayNumber = parseInt(data.day.replace('D', ''), 10);
+        const logDate = sprint.sprintDays.find(d => d.day === dayNumber)?.date;
+        if (!logDate) return sprint; // Should not happen if UI is correct
 
         const newLog: DailyLog = {
-          date: data.date,
+          date: logDate,
           loggedHours: data.loggedHours,
         };
 
         if (isNewTicket) {
           const newTicket: Ticket = {
             id: ticketId,
-            title: data.newTicketTitle!,
+            title: data.newTicketTitle || data.newTicketId!,
             scope: data.scope,
             type: data.type,
             typeScope: data.typeScope,
@@ -305,15 +314,18 @@ export default function SprintDashboard() {
             status: data.status,
             dailyLogs: [newLog],
             timeLogged: newLog.loggedHours,
-            creationDate: new Date(data.date).toISOString().split('T')[0],
+            creationDate: new Date(logDate).toISOString().split('T')[0],
           };
+          if (newTicket.type === 'Bug' || newTicket.type === 'Buffer') {
+            newTicket.estimation = newTicket.timeLogged;
+          }
           if (newTicket.status === 'Done') {
-            newTicket.completionDate = new Date(data.date).toISOString().split('T')[0];
+            newTicket.completionDate = new Date(logDate).toISOString().split('T')[0];
           }
           newTickets.push(newTicket);
         } else if (ticket) {
           const newDailyLogs = [...(ticket.dailyLogs || [])];
-          const existingLogIndex = newDailyLogs.findIndex(l => l.date === data.date);
+          const existingLogIndex = newDailyLogs.findIndex(l => l.date === logDate);
 
           if (existingLogIndex !== -1) {
             newDailyLogs[existingLogIndex].loggedHours += data.loggedHours;
@@ -326,9 +338,13 @@ export default function SprintDashboard() {
           const isDone = data.status === 'Done';
 
           let updatedTicket: Ticket = { ...ticket, status: data.status, dailyLogs: newDailyLogs, timeLogged };
+          
+          if (updatedTicket.type === 'Bug' || updatedTicket.type === 'Buffer') {
+            updatedTicket.estimation = timeLogged;
+          }
 
           if (!wasDone && isDone) {
-            updatedTicket.completionDate = new Date(data.date).toISOString().split('T')[0];
+            updatedTicket.completionDate = new Date(logDate).toISOString().split('T')[0];
           } else if (wasDone && !isDone) {
             delete updatedTicket.completionDate;
           }
@@ -355,9 +371,16 @@ export default function SprintDashboard() {
         let typeScope: TicketTypeScope = 'Build';
         if (task.type === 'Bug') typeScope = 'Run';
         else if (task.type === 'Buffer') typeScope = 'Sprint';
+        else if (task.type === 'User story') typeScope = 'Build';
+        
+        const canonicalScope = teams.find(t => t.toLowerCase() === task.scope.toLowerCase()) || 'Out of Scope';
+        const estimation = Number(task.estimation) || 0;
+
         return {
           ...task,
-          estimation: Number(task.estimation) || 0,
+          scope: canonicalScope,
+          title: task.title || task.id,
+          estimation: estimation,
           typeScope,
           timeLogged: 0,
           dailyLogs: [],
@@ -404,18 +427,20 @@ export default function SprintDashboard() {
         let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
 
         if (!ticket) {
-          if (!log.title || !log.scope || !log.type) continue;
+          if (!log.scope || !log.type) continue;
           
           let typeScope: TicketTypeScope = log.typeScope || 'Build';
           if (log.type === 'Bug') typeScope = 'Run';
           else if (log.type === 'Buffer') typeScope = 'Sprint';
+          else if (log.type === 'User story') typeScope = 'Build';
           
           const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
+          const canonicalScope = teams.find(t => t.toLowerCase() === log.scope!.toLowerCase()) || 'Out of Scope';
 
           ticket = {
             id: log.ticketId,
-            title: log.title,
-            scope: log.scope,
+            title: log.title || log.ticketId,
+            scope: canonicalScope,
             type: log.type,
             typeScope: typeScope,
             estimation: estimation,
@@ -458,6 +483,9 @@ export default function SprintDashboard() {
       sprintToUpdate.tickets.forEach((ticket: Ticket) => {
           if (ticket.dailyLogs) {
               ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
+              if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
+                  ticket.estimation = ticket.timeLogged;
+              }
           }
       });
 

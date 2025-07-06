@@ -27,12 +27,12 @@ interface AddTaskDialogProps {
 
 const formSchema = z.object({
   id: z.string().regex(/^WIN-\d+$/, "Ticket ID must be in WIN-XXXX format"),
-  title: z.string().min(1, "Title is required"),
+  title: z.string().optional(),
   scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]]),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
-  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketStatus[]]),
+  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
 })
 
 export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogProps) {
@@ -60,7 +60,11 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
 
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    onAddTask({ ...values, timeLogged: 0 })
+    const taskData = {
+      ...values,
+      title: values.title || values.id,
+    };
+    onAddTask({ ...taskData, timeLogged: 0 })
     setIsOpen(false)
     form.reset()
   }

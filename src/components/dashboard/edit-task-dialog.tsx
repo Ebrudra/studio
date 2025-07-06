@@ -28,12 +28,12 @@ interface EditTaskDialogProps {
 
 const formSchema = z.object({
   id: z.string(),
-  title: z.string().min(1, "Title is required"),
+  title: z.string().optional(),
   scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]]),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
-  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketStatus[]]),
+  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
 })
 
 export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTaskDialogProps) {
@@ -79,7 +79,8 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     // We spread the original task to keep fields like timeLogged and dailyLogs intact
-    onUpdateTask({ ...task, ...values })
+    const updatedTaskData = { ...task, ...values, title: values.title || task.id };
+    onUpdateTask(updatedTaskData)
     setIsOpen(false)
   }
 

@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -38,18 +37,18 @@ const formSchema = z.object({
   newTicketTitle: z.string().optional(),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
-  date: z.string({ required_error: "Day is required" }),
+  day: z.string({ required_error: "Day is required" }),
   estimation: z.coerce.number(),
   loggedHours: z.coerce.number().min(0.1, "Logged hours must be greater than 0"),
-  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketStatus[]]),
+  status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
 }).refine(data => {
     if (data.ticketId === 'new-ticket') {
-        return !!data.newTicketId && !!data.newTicketTitle;
+        return !!data.newTicketId;
     }
     return true;
 }, {
-    message: "New Ticket ID and Title are required when creating a new ticket.",
-    path: ["newTicketTitle"],
+    message: "New Ticket ID is required.",
+    path: ["newTicketId"],
 });
 
 
@@ -76,7 +75,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
         const dateWithTimezone = new Date(dayInfo.date);
         dateWithTimezone.setMinutes(dateWithTimezone.getMinutes() + dateWithTimezone.getTimezoneOffset());
         return {
-            value: dayInfo.date,
+            value: `D${dayInfo.day}`,
             label: `D${dayInfo.day} (${dateWithTimezone.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
         }
     });
@@ -266,7 +265,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
              <div className="grid grid-cols-2 gap-4">
                 <FormField
                     control={control}
-                    name="date"
+                    name="day"
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Day</FormLabel>
