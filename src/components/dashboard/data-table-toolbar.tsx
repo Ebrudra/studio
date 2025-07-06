@@ -2,12 +2,10 @@
 "use client"
 
 import { Table } from "@tanstack/react-table"
-import { Filter, X } from "lucide-react"
+import { Filter, X, List, CalendarDays, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DataTableViewOptions } from "./data-table-view-options"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { statuses, scopes, typeScopes } from "./data"
@@ -89,27 +87,37 @@ export function DataTableToolbar<TData>({
         )}
       </div>
        <div className="flex items-center space-x-4">
-        <RadioGroup
-            value={viewMode}
-            onValueChange={(value) => onViewModeChange(value as any)}
-            className="flex items-center space-x-1"
-        >
-            <Label htmlFor="view-list" className="cursor-pointer rounded-md border-2 border-transparent px-2.5 py-1 text-sm font-medium data-[state=checked]:border-primary data-[state=checked]:bg-muted" data-state={viewMode === 'list' ? 'checked' : 'unchecked'}>
-                <RadioGroupItem value="list" id="view-list" className="sr-only" />
-                List
-            </Label>
-             <Label htmlFor="view-day" className="cursor-pointer rounded-md border-2 border-transparent px-2.5 py-1 text-sm font-medium data-[state=checked]:border-primary data-[state=checked]:bg-muted" data-state={viewMode === 'byDay' ? 'checked' : 'unchecked'}>
-                <RadioGroupItem value="byDay" id="view-day" className="sr-only" />
-                Group by Day
-            </Label>
-             <Label htmlFor="view-team" className="cursor-pointer rounded-md border-2 border-transparent px-2.5 py-1 text-sm font-medium data-[state=checked]:border-primary data-[state=checked]:bg-muted" data-state={viewMode === 'byTeam' ? 'checked' : 'unchecked'}>
-                <RadioGroupItem value="byTeam" id="view-team" className="sr-only" />
-                Group by Team
-            </Label>
-        </RadioGroup>
+        <div className="flex items-center space-x-2">
+            <Button
+                onClick={() => onViewModeChange('list')}
+                variant={viewMode === 'list' ? 'default' : 'secondary'}
+                size="icon"
+                aria-label="List view"
+            >
+                <List className="h-4 w-4" />
+            </Button>
+            <Button
+                onClick={() => onViewModeChange('byDay')}
+                variant={viewMode === 'byDay' ? 'default' : 'secondary'}
+                size="icon"
+                aria-label="Group by day"
+            >
+                <CalendarDays className="h-4 w-4" />
+            </Button>
+            <Button
+                onClick={() => onViewModeChange('byTeam')}
+                variant={viewMode === 'byTeam' ? 'default' : 'secondary'}
+                size="icon"
+                aria-label="Group by team"
+            >
+                <Users className="h-4 w-4" />
+            </Button>
+        </div>
 
         <DataTableViewOptions table={table} />
       </div>
     </div>
   )
 }
+
+    

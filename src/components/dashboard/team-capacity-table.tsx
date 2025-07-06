@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,6 +15,19 @@ interface TeamCapacityTableProps {
 
 export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
   const [viewMode, setViewMode] = React.useState<'card' | 'list'>('card')
+
+  if (!sprint || !sprint.teamCapacity || !sprint.tickets) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Team Capacity & Delivery</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground">Not enough data to display capacity.</p>
+            </CardContent>
+        </Card>
+    )
+  }
 
   return (
     <Card>
@@ -32,10 +46,10 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
                 <Button
                     onClick={() => setViewMode('card')}
                     variant={viewMode === 'card' ? 'default' : 'secondary'}
-                    size="sm"
+                    size="icon"
                 >
-                    <LayoutGrid className="mr-2 h-4 w-4" />
-                    <span>Grid</span>
+                    <LayoutGrid className="h-4 w-4" />
+                    <span className="sr-only">Grid</span>
                 </Button>
             </div>
         </div>
@@ -51,3 +65,5 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
     </Card>
   )
 }
+
+    

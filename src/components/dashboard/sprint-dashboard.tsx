@@ -33,6 +33,7 @@ import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { InsightBulb } from './insight-bulb';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -177,6 +178,58 @@ export default function SprintDashboard() {
 
     return warnings;
   }, [processedSprint]);
+  
+  const metricsData = useMemo(() => {
+    if (!processedSprint || !selectedSprint) return null;
+
+    const velocitySprints = sprints
+      .filter(s => s.status === 'Completed' || s.id === selectedSprint.id)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+      .slice(-5);
+
+    const velocityHistory = velocitySprints.map(s => {
+      const buildTickets = s.tickets.filter(t => t.typeScope === 'Build');
+      const completed = buildTickets.filter(t => t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
+      const duration = s.sprintDays?.length || 1;
+      return duration > 0 ? completed / duration : 0;
+    });
+
+    const currentVelocity = velocityHistory.length > 0 ? velocityHistory[velocityHistory.length - 1] : 0;
+    const previousVelocity = velocityHistory.length > 1 ? velocityHistory[velocityHistory.length - 2] : 0;
+    const velocityTrend = currentVelocity >= previousVelocity ? "up" : "down";
+    const velocityChange = previousVelocity > 0 ? Math.abs(((currentVelocity - previousVelocity) / previousVelocity) * 100) : 0;
+
+    const capacityData = (Object.keys(processedSprint.teamCapacity || {}) as Team[])
+      .filter(t => t !== 'Out of Scope')
+      .map(team => {
+        const teamTickets = (processedSprint.tickets || []).filter(t => t.scope === team)
+        const capacity = processedSprint.teamCapacity?.[team];
+        const plannedBuild = capacity?.plannedBuild ?? 0;
+        const plannedRun = capacity?.plannedRun ?? 0;
+        const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+        const totalPlanned = plannedBuild + plannedRun
+        const totalDelivered = deliveredBuild + teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
+        return { totalPlanned, totalDelivered };
+      });
+      
+    const totals = capacityData.reduce((acc, data) => {
+        acc.totalPlanned += data.totalPlanned
+        acc.totalDelivered += data.totalDelivered
+        return acc
+    }, { totalPlanned: 0, totalDelivered: 0 });
+
+    const teamEfficiency = totals.totalPlanned > 0 ? (totals.totalDelivered / totals.totalPlanned) * 100 : 0;
+
+    return {
+        currentVelocity,
+        velocityTrend,
+        velocityChange,
+        sprintProgress: processedSprint.summaryMetrics.percentageComplete,
+        remainingWork: processedSprint.summaryMetrics.remainingWork,
+        teamEfficiency,
+    }
+
+  }, [sprints, selectedSprint, processedSprint]);
 
   const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
     setSprints(currentSprints => {
@@ -659,48 +712,115 @@ export default function SprintDashboard() {
         </div>
       )}
 
-      <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
-      
-      <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                    Sprint Tasks
-                    <Badge variant="outline">{processedSprint.tickets.length}</Badge>
-                </CardTitle>
+      {metricsData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-2xl font-bold">{metricsData.currentVelocity.toFixed(1)}</div>
+                        <div className="text-xs text-muted-foreground">Current Velocity</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {metricsData.velocityTrend === "up" ? (
+                        <TrendingUp className="w-4 h-4 text-success" />
+                        ) : (
+                        <TrendingDown className="w-4 h-4 text-destructive" />
+                        )}
+                        <span className={`text-xs ${metricsData.velocityTrend === "up" ? "text-success" : "text-destructive"}`}>
+                        {metricsData.velocityChange.toFixed(1)}%
+                        </span>
+                    </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <div className="flex items-center gap-2">
-                    {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
-                    <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Bulk Upload
-                    </Button>
-                    <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Log Progress
-                    </Button>
-                    <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Task
-                    </Button>
-                    <Button onClick={() => setIsReportOpen(true)} variant="outline" size="sm" disabled={!processedSprint.tickets.length}>
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        {selectedSprint.generatedReport ? "View Report" : "Generate Report"}
-                    </Button>
-                </div>
-                </div>
-            </CardHeader>
-          <CardContent>
-              <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
-          </CardContent>
-       </Card>
-      
-       <div className="grid grid-cols-1 gap-6">
-          <TeamCapacityTable sprint={processedSprint} />
-      </div>
+            <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                    <Target className="w-5 h-5 text-primary" />
+                    <div>
+                    <div className="text-2xl font-bold">{metricsData.sprintProgress.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground">Sprint Progress</div>
+                    </div>
+                </CardContent>
+            </Card>
 
-       <TeamDailyProgress dailyProgress={dailyProgressData} />
+            <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-warning" />
+                    <div>
+                    <div className="text-2xl font-bold">{metricsData.remainingWork.toFixed(1)}h</div>
+                    <div className="text-xs text-muted-foreground">Remaining Work</div>
+                    </div>
+                </CardContent>
+            </Card>
 
+            <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                    <Users className="w-5 h-5 text-purple-500" />
+                    <div>
+                    <div className="text-2xl font-bold">{metricsData.teamEfficiency.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground">Team Efficiency</div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+       )}
+
+
+      <Tabs defaultValue="tasks" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="tasks">Sprint Tasks</TabsTrigger>
+            <TabsTrigger value="charts">Charts & Analytics</TabsTrigger>
+            <TabsTrigger value="capacity">Team Capacity</TabsTrigger>
+            <TabsTrigger value="progress">Daily Progress</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tasks" className="mt-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                        Sprint Tasks
+                        <Badge variant="outline">{processedSprint.tickets.length}</Badge>
+                    </CardTitle>
+
+                    <div className="flex items-center gap-2">
+                        {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
+                        <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Bulk Upload
+                        </Button>
+                        <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Log Progress
+                        </Button>
+                        <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Task
+                        </Button>
+                        <Button onClick={() => setIsReportOpen(true)} variant="outline" size="sm" disabled={!processedSprint.tickets.length}>
+                            <BarChart3 className="w-4 h-4 mr-2" />
+                            {selectedSprint.generatedReport ? "View Report" : "Generate Report"}
+                        </Button>
+                    </div>
+                    </div>
+                </CardHeader>
+              <CardContent>
+                  <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
+              </CardContent>
+           </Card>
+        </TabsContent>
+        <TabsContent value="charts" className="mt-6">
+             <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
+        </TabsContent>
+        <TabsContent value="capacity" className="mt-6">
+            <TeamCapacityTable sprint={processedSprint} />
+        </TabsContent>
+        <TabsContent value="progress" className="mt-6">
+            <TeamDailyProgress dailyProgress={dailyProgressData} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
+

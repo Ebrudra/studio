@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -249,28 +248,25 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   };
 
   return (
-    <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex items-center justify-between">
-          <TabsList className="grid w-full max-w-md grid-cols-4">
-            <TabsTrigger value="burndown">Burndown</TabsTrigger>
-            <TabsTrigger value="velocity">Velocity</TabsTrigger>
-            <TabsTrigger value="teams">Teams</TabsTrigger>
-            <TabsTrigger value="distribution">Distribution</TabsTrigger>
-          </TabsList>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled>
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-          </div>
+            <TabsList className="grid w-full max-w-md grid-cols-4">
+                <TabsTrigger value="burndown">Burndown</TabsTrigger>
+                <TabsTrigger value="velocity">Velocity</TabsTrigger>
+                <TabsTrigger value="teams">Teams</TabsTrigger>
+                <TabsTrigger value="distribution">Distribution</TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled>
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filters
+                </Button>
+                <Button variant="outline" size="sm" disabled>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+            </div>
         </div>
-
         <TabsContent value="burndown" className="space-y-4">
           <Card>
             <CardHeader className="space-y-4">
@@ -540,7 +536,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             </Card>
           </div>
         </TabsContent>
-      </Tabs>
-    </div>
+    </Tabs>
   )
 }
