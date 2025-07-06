@@ -207,6 +207,7 @@ export default function SprintDashboard() {
       id: `sprint-${sprints.length + 1}-${Date.now()}`,
       lastUpdatedAt: new Date().toISOString(),
       tickets: [],
+      generatedReport: undefined,
     };
     updateSprints(prevSprints => [...prevSprints, newSprint]);
     setSelectedSprintId(newSprint.id);
@@ -221,17 +222,8 @@ export default function SprintDashboard() {
     toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
   };
 
-  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged" | "title"> & { title?: string }) => {
-    const taskWithTitle = { ...newTaskData, title: newTaskData.title || newTaskData.id };
-    const newTask: Ticket = { ...taskWithTitle, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
-    
-    if (newTask.type === 'Bug') {
-        newTask.typeScope = 'Run';
-    } else if (newTask.type === 'Buffer') {
-        newTask.typeScope = 'Sprint';
-    } else {
-        newTask.typeScope = 'Build';
-    }
+  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
+    const newTask: Ticket = { ...newTaskData, title: newTaskData.title || newTaskData.id, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
 
     updateSprints(prevSprints =>
       prevSprints.map(sprint =>
@@ -247,17 +239,7 @@ export default function SprintDashboard() {
       prevSprints.map(sprint => {
         if (sprint.id !== selectedSprintId) return sprint;
         
-        let finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
-
-        if (finalTask.type === 'Bug') {
-            finalTask.typeScope = 'Run';
-        } else if (finalTask.type === 'Buffer') {
-            finalTask.typeScope = 'Sprint';
-        } else if (finalTask.type !== 'User story' && finalTask.scope === 'Out of Scope') {
-            finalTask.typeScope = 'Build';
-        } else if (finalTask.type === 'User story') {
-            finalTask.typeScope = 'Build';
-        }
+        const finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
 
         if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
           finalTask.estimation = finalTask.timeLogged;
@@ -266,23 +248,6 @@ export default function SprintDashboard() {
         const newTickets = sprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
         return { ...sprint, tickets: newTickets, lastUpdatedAt: new Date().toISOString() };
       })
-    );
-  };
-
-  const handleUpdateTeamCapacity = (team: Team, capacity: TeamCapacity) => {
-    updateSprints(prevSprints =>
-      prevSprints.map(sprint =>
-        sprint.id === selectedSprintId
-          ? {
-              ...sprint,
-              teamCapacity: {
-                ...sprint.teamCapacity,
-                [team]: capacity,
-              },
-              lastUpdatedAt: new Date().toISOString(),
-            }
-          : sprint
-      )
     );
   };
 
@@ -399,9 +364,10 @@ export default function SprintDashboard() {
         const estimation = Number(task.estimation) || 0;
 
         return {
-          ...task,
-          scope: canonicalScope,
+          id: task.id,
           title: task.title || task.id,
+          scope: canonicalScope,
+          type: task.type,
           estimation: estimation,
           typeScope,
           timeLogged: 0,
@@ -818,10 +784,8 @@ export default function SprintDashboard() {
         </div>
       </div>
       
-       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-5 space-y-6">
-             <TeamCapacityTable sprint={processedSprint} onUpdateTeamCapacity={handleUpdateTeamCapacity} isSprintCompleted={isSprintCompleted} />
-        </div>
+       <div className="grid grid-cols-1 gap-6">
+          <TeamCapacityTable sprint={processedSprint} />
       </div>
 
        <TeamDailyProgress dailyProgress={dailyProgressData} />
