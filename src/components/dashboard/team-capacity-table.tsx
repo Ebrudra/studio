@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -22,7 +21,7 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
         <div className="flex items-center justify-between">
             <CardTitle>Team Capacity & Delivery</CardTitle>
             <RadioGroup
-                defaultValue="card"
+                value={viewMode}
                 onValueChange={(value: 'card' | 'list') => setViewMode(value)}
                 className="flex items-center space-x-1"
             >
