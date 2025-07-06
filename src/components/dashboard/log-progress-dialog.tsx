@@ -43,7 +43,7 @@ const formSchema = z.object({
   status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
 }).refine(data => {
     if (data.ticketId === 'new-ticket') {
-        return !!data.newTicketId;
+        return !!data.newTicketId && data.newTicketId.length > 0;
     }
     return true;
 }, {
@@ -141,7 +141,8 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   }
 
   const onSubmit = (values: LogProgressData) => {
-    onLogProgress(values)
+    const dataToLog = {...values, title: values.newTicketTitle || values.newTicketId};
+    onLogProgress(dataToLog)
     handleClose()
   }
 
@@ -163,7 +164,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Scope (Team)</FormLabel>
-                        <Select onValueChange={(v) => { field.onChange(v); setValue("ticketId", ""); }} value={field.value} disabled={!!taskToLog}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!taskToLog}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
                         </FormControl>
