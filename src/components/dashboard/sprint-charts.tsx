@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -37,8 +38,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   const burndownData = React.useMemo(() => {
     if (!sprint.sprintDays || sprint.sprintDays.length === 0) return []
 
-    const sprintDurationInDays = sprint.sprintDays.length
-
     let filteredTickets = sprint.tickets
     if (selectedTeam !== "all-teams") {
       filteredTickets = filteredTickets.filter(t => t.scope === selectedTeam)
@@ -60,8 +59,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     const initialScope = calculateScope('total')
     const initialBuildScope = calculateScope('build')
     const initialRunScope = calculateScope('run')
-    
-    const idealBurnPerDay = initialScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
     
     const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; loggedHours: number; loggedBuild: number; loggedRun: number }>()
     sprint.sprintDays.forEach(day => {
@@ -93,45 +90,47 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         }
     }
 
-    let cumulativeLogged = 0
-    let cumulativeLoggedBuild = 0
-    let cumulativeLoggedRun = 0
-    let cumulativeNewScope = 0
-    let cumulativeNewBuildScope = 0
-    let cumulativeNewRunScope = 0
+    const sprintDurationInDays = sprint.sprintDays.length
+    const idealBurnPerDay = sprintDurationInDays > 0 ? initialScope / sprintDurationInDays : 0
 
-    const processedData = sprint.sprintDays.map((dayData, index) => {
-        const delta = dailyDelta.get(dayData.date) || { newScope: 0, newBuildScope: 0, newRunScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0 }
+    let remainingActual = initialScope;
+    let remainingBuild = initialBuildScope;
+    let remainingRun = initialRunScope;
+
+    const dailyData = sprint.sprintDays.map((dayData, index) => {
+        const delta = dailyDelta.get(dayData.date) || { newScope: 0, newBuildScope: 0, newRunScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0 };
         
-        cumulativeLogged += delta.loggedHours
-        cumulativeLoggedBuild += delta.loggedBuild
-        cumulativeLoggedRun += delta.loggedRun
+        remainingActual += delta.newScope - delta.loggedHours;
+        remainingBuild += delta.newBuildScope - delta.loggedBuild;
+        remainingRun += delta.newRunScope - delta.loggedRun;
         
-        if (index > 0) {
-            const yesterdayDelta = dailyDelta.get(sprint.sprintDays[index - 1].date)
-            cumulativeNewScope += yesterdayDelta?.newScope || 0
-            cumulativeNewBuildScope += yesterdayDelta?.newBuildScope || 0
-            cumulativeNewRunScope += yesterdayDelta?.newRunScope || 0
-        }
-        
-        const remainingScope = initialScope + cumulativeNewScope - cumulativeLogged
-        const remainingBuild = initialBuildScope + cumulativeNewBuildScope - cumulativeLoggedBuild
-        const remainingRun = initialRunScope + cumulativeNewRunScope - cumulativeLoggedRun
-        
-        const idealBurn = parseFloat((initialScope - index * idealBurnPerDay).toFixed(2))
+        const idealBurn = parseFloat((initialScope - (index + 1) * idealBurnPerDay).toFixed(2));
 
         return {
             day: `Day ${dayData.day}`,
             ideal: idealBurn < 0 ? 0 : idealBurn,
-            actual: remainingScope < 0 ? 0 : remainingScope,
+            actual: remainingActual < 0 ? 0 : remainingActual,
             build: remainingBuild < 0 ? 0 : remainingBuild,
             run: remainingRun < 0 ? 0 : remainingRun,
             date: dayData.date
         }
-    })
+    });
+
+    const processedData = [
+        {
+            day: 'Day 0',
+            ideal: initialScope,
+            actual: initialScope,
+            build: initialBuildScope,
+            run: initialRunScope,
+            date: new Date(new Date(sprint.startDate).getTime() - 86400000).toISOString().split('T')[0],
+        },
+        ...dailyData
+    ];
 
     if (!showProjection && sprint.status !== 'Completed') {
-        return processedData.filter(d => d.date <= today)
+        const todayDate = new Date(today);
+        return processedData.filter(d => new Date(d.date) <= todayDate);
     }
     return processedData
   }, [sprint, selectedTeam, showProjection, today])
