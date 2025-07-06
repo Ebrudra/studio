@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { teams as allTeams } from "@/lib/data"
+import { Badge } from "../ui/badge"
 
 interface SprintChartsProps {
   sprint: Sprint
@@ -61,9 +62,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     const initialRunScope = calculateScope('run')
     
     const idealBurnPerDay = initialScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
-    const idealBuildBurnPerDay = initialBuildScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
-    const idealRunBurnPerDay = initialRunScope / (sprintDurationInDays > 1 ? sprintDurationInDays - 1 : 1)
-
+    
     const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; loggedHours: number; loggedBuild: number; loggedRun: number }>()
     sprint.sprintDays.forEach(day => {
         dailyDelta.set(day.date, { newScope: 0, newBuildScope: 0, newRunScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0 })
@@ -131,7 +130,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         }
     })
 
-    if (!showProjection) {
+    if (!showProjection && sprint.status !== 'Completed') {
         return processedData.filter(d => d.date <= today)
     }
     return processedData
@@ -147,7 +146,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             const planned = s.buildCapacity || 0;
             const completed = buildTickets.filter(t => t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
             const duration = s.sprintDays?.length || 1;
-            const velocity = completed / duration;
+            const velocity = duration > 0 ? completed / duration : 0;
             return { sprint: s.name.split('(')[0].trim(), planned, completed, velocity: parseFloat(velocity.toFixed(1)) };
         });
   }, [allSprints, sprint.id]);
@@ -163,7 +162,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             const completed = teamTickets.filter(t=>t.status==='Done').reduce((acc, t) => acc + t.estimation, 0)
             const efficiency = planned > 0 ? (completed / planned) * 100 : 0
             const duration = sprint.sprintDays?.length || 1;
-            const velocity = completed / duration;
+            const velocity = duration > 0 ? completed / duration : 0;
             
             return { team, planned, completed, efficiency: parseFloat(efficiency.toFixed(1)), velocity: parseFloat(velocity.toFixed(1)) }
         })
@@ -187,22 +186,38 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   }, [dailyProgress])
   
   const distributionData = React.useMemo(() => {
-    const scopeData: Record<string, number> = { Build: 0, Run: 0, Sprint: 0 }
-    const workData: Record<string, number> = { Build: 0, Run: 0, Sprint: 0 }
+    const workByType: Record<string, number> = { Build: 0, Run: 0, Sprint: 0 }
+    const workByTeam: Record<string, number> = {}
+    allTeams.forEach(team => workByTeam[team] = 0);
+
     sprint.tickets.forEach(ticket => {
-        scopeData[ticket.typeScope] += ticket.estimation
-        workData[ticket.typeScope] += ticket.timeLogged
+        if(ticket.timeLogged > 0) {
+            workByType[ticket.typeScope] = (workByType[ticket.typeScope] || 0) + ticket.timeLogged;
+            if (workByTeam.hasOwnProperty(ticket.scope)) {
+                workByTeam[ticket.scope] += ticket.timeLogged;
+            }
+        }
     })
     
-    const totalScope = Object.values(scopeData).reduce((s, v) => s + v, 0)
-    const totalWork = Object.values(workData).reduce((s, v) => s + v, 0)
-    
-    const scopeDistribution = Object.entries(scopeData).map(([name, value]) => ({ name, value, total: totalScope, percent: totalScope > 0 ? (value / totalScope) * 100 : 0 }))
-    const workDistribution = Object.entries(workData).map(([name, value]) => ({ name, value, total: totalWork, percent: totalWork > 0 ? (value / totalWork) * 100 : 0 }))
-    
-    return { scope: scopeDistribution, work: workDistribution, totalScope, totalWork }
-  }, [sprint.tickets]);
+    const totalWork = Object.values(workByType).reduce((s, v) => s + v, 0);
 
+    const formatDistribution = (data: Record<string, number>, total: number) => {
+        return Object.entries(data)
+            .filter(([, value]) => value > 0)
+            .map(([name, value]) => ({
+                name,
+                value,
+                hours: value,
+                percent: total > 0 ? (value / total) * 100 : 0,
+            }));
+    };
+    
+    return { 
+        workByType: formatDistribution(workByType, totalWork),
+        workByTeam: formatDistribution(workByTeam, totalWork),
+        totalWork
+    }
+  }, [sprint.tickets]);
 
   const getBurndownKey = () => {
     switch(burndownType) {
@@ -220,11 +235,19 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     }
   }
   
-  const COLORS: Record<string, string> = {
+  const TYPE_COLORS: Record<string, string> = {
     Build: "hsl(var(--chart-1))",
     Run: "hsl(var(--chart-2))",
     Sprint: "hsl(var(--chart-3))",
-  }
+  };
+
+  const TEAM_COLORS: Record<string, string> = {
+    Backend: "hsl(var(--chart-1))",
+    iOS: "hsl(var(--chart-2))",
+    Web: "hsl(var(--chart-3))",
+    Android: "hsl(var(--chart-4))",
+    Mobile: "hsl(var(--chart-5))",
+  };
 
   return (
     <div className="space-y-6">
@@ -255,7 +278,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Sprint Burndown Chart</CardTitle>
-                  <p className="text-sm text-muted-foreground">Track remaining work over sprint duration</p>
+                  <p className="text-sm text-muted-foreground">Track remaining work over the sprint's duration.</p>
                 </div>
                 <Select value={selectedTeam} onValueChange={(v) => setSelectedTeam(v as any)}>
                   <SelectTrigger className="w-40">
@@ -318,6 +341,20 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                   </LineChart>
                 </ResponsiveContainer>
               </ChartContainer>
+               <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold">{sprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
+                  <div className="text-sm text-muted-foreground">Work Remaining</div>
+                </div>
+                <div className="text-center p-4 bg-primary/10 rounded-lg">
+                  <div className="text-2xl font-bold text-primary">{sprint.summaryMetrics.completedWork.toFixed(1)}h</div>
+                  <div className="text-sm text-muted-foreground">Work Completed</div>
+                </div>
+                <div className="text-center p-4 bg-success/10 rounded-lg">
+                  <div className="text-2xl font-bold text-success">{sprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
+                  <div className="text-sm text-muted-foreground">Progress</div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -327,7 +364,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             <Card>
               <CardHeader>
                 <CardTitle>Sprint Velocity Trend</CardTitle>
-                <p className="text-sm text-muted-foreground">Velocity over last 5 sprints</p>
+                <p className="text-sm text-muted-foreground">Team velocity (completed build work per day) over the last 5 sprints.</p>
               </CardHeader>
               <CardContent>
                 <ChartContainer
@@ -357,7 +394,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             <Card>
               <CardHeader>
                 <CardTitle>Daily Velocity</CardTitle>
-                <p className="text-sm text-muted-foreground">Hours completed per day by team</p>
+                <p className="text-sm text-muted-foreground">Total hours logged per day, stacked by team.</p>
               </CardHeader>
               <CardContent>
                 <ChartContainer
@@ -391,7 +428,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
           <Card>
             <CardHeader>
               <CardTitle>Team Performance Analysis</CardTitle>
-              <p className="text-sm text-muted-foreground">Efficiency and velocity by team</p>
+              <p className="text-sm text-muted-foreground">Compare each team's completed work against their plan and their efficiency.</p>
             </CardHeader>
             <CardContent>
               <ChartContainer
@@ -415,6 +452,18 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                   </ComposedChart>
                 </ResponsiveContainer>
               </ChartContainer>
+               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                {teamPerformanceData.map((team) => (
+                  <div key={team.team} className="p-4 bg-muted/50 rounded-lg">
+                    <div className="font-medium text-sm">{team.team}</div>
+                    <div className="text-2xl font-bold mt-1">{team.efficiency.toFixed(0)}%</div>
+                    <div className="text-xs text-muted-foreground">Efficiency</div>
+                    <Badge variant="outline" className="mt-2 font-normal">
+                      {team.velocity}h/day
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -423,33 +472,31 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Scope Distribution</CardTitle>
-                <p className="text-sm text-muted-foreground">{distributionData.totalScope.toFixed(1)}h Total Scope</p>
+                <CardTitle>Work Distribution by Team</CardTitle>
+                <p className="text-sm text-muted-foreground">Breakdown of total hours logged by each team.</p>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center mb-6">
-                  <ChartContainer config={COLORS} className="h-[250px] w-[250px]">
+                 <ChartContainer config={TEAM_COLORS} className="h-[250px] mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={distributionData.scope} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        <Pie data={distributionData.workByTeam} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
+                          label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
                         >
-                          {distributionData.scope.map((entry) => ( <Cell key={entry.name} fill={COLORS[entry.name]} /> ))}
+                          {distributionData.workByTeam.map((entry) => ( <Cell key={entry.name} fill={TEAM_COLORS[entry.name]} /> ))}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </ChartContainer>
-                </div>
-                <div className="space-y-3">
-                  {distributionData.scope.map((item) => (
+                <div className="space-y-3 mt-6">
+                  {distributionData.workByTeam.map((item) => (
                     <div key={item.name} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: COLORS[item.name] }} />
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: TEAM_COLORS[item.name] }} />
                         <span className="font-medium">{item.name}</span>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{item.value.toFixed(1)}h</div>
+                        <div className="font-bold">{item.hours.toFixed(1)}h</div>
                         <div className="text-sm text-muted-foreground">{item.percent.toFixed(1)}%</div>
                       </div>
                     </div>
@@ -460,33 +507,31 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
 
             <Card>
               <CardHeader>
-                <CardTitle>Work Distribution</CardTitle>
-                <p className="text-sm text-muted-foreground">{distributionData.totalWork.toFixed(1)}h Total Logged</p>
+                <CardTitle>Work Distribution by Type</CardTitle>
+                <p className="text-sm text-muted-foreground">Breakdown of total hours logged by work type.</p>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center mb-6">
-                   <ChartContainer config={COLORS} className="h-[250px] w-[250px]">
+                 <ChartContainer config={TYPE_COLORS} className="h-[250px] mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={distributionData.work} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        <Pie data={distributionData.workByType} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
+                            label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
                         >
-                          {distributionData.work.map((entry) => ( <Cell key={entry.name} fill={COLORS[entry.name]} /> ))}
+                          {distributionData.workByType.map((entry) => ( <Cell key={entry.name} fill={TYPE_COLORS[entry.name]} /> ))}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </ChartContainer>
-                </div>
-                <div className="space-y-3">
-                  {distributionData.work.map((item) => (
+                <div className="space-y-3 mt-6">
+                  {distributionData.workByType.map((item) => (
                     <div key={item.name} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: COLORS[item.name] }} />
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: TYPE_COLORS[item.name] }} />
                         <span className="font-medium">{item.name}</span>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{item.value.toFixed(1)}h</div>
+                        <div className="font-bold">{item.hours.toFixed(1)}h</div>
                         <div className="text-sm text-muted-foreground">{item.percent.toFixed(1)}%</div>
                       </div>
                     </div>

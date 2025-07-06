@@ -178,43 +178,6 @@ export default function SprintDashboard() {
     return warnings;
   }, [processedSprint]);
 
-  const analyticsMetrics = React.useMemo(() => {
-    if (!processedSprint || !sprints.length) {
-        return {
-            currentVelocity: 0,
-            velocityTrend: 'down',
-            velocityChange: 0,
-            teamEfficiency: 0
-        };
-    }
-    const completedSprints = sprints.filter(s => s.status === 'Completed').sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-    
-    const calculateVelocity = (sprint: Sprint) => {
-        const completedBuild = sprint.tickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
-        const duration = sprint.sprintDays?.length || 1;
-        return completedBuild / duration;
-    }
-
-    const currentVelocity = calculateVelocity(processedSprint);
-    
-    const lastCompletedSprint = completedSprints.length > 0 ? completedSprints[completedSprints.length - 1] : null;
-    const previousVelocity = lastCompletedSprint ? calculateVelocity(lastCompletedSprint) : 0;
-    
-    const velocityTrend = currentVelocity > previousVelocity ? 'up' : 'down';
-    const velocityChange = previousVelocity > 0 ? Math.abs(((currentVelocity - previousVelocity) / previousVelocity) * 100) : 0;
-    
-    const totalPlanned = (processedSprint.buildCapacity || 0) + (processedSprint.runCapacity || 0);
-    const totalCompleted = processedSprint.tickets.filter(t=>t.status==='Done').reduce((acc, t) => acc + t.estimation, 0);
-    const teamEfficiency = totalPlanned > 0 ? (totalCompleted / totalPlanned) * 100 : 0;
-
-    return {
-        currentVelocity: parseFloat(currentVelocity.toFixed(1)),
-        velocityTrend,
-        velocityChange: parseFloat(velocityChange.toFixed(1)),
-        teamEfficiency: parseFloat(teamEfficiency.toFixed(1)),
-    }
-  }, [processedSprint, sprints]);
-  
   const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
     setSprints(currentSprints => {
         const newSprints = updateFn(currentSprints);
@@ -695,62 +658,6 @@ export default function SprintDashboard() {
             ))}
         </div>
       )}
-
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                <div>
-                    <div className="text-2xl font-bold">{analyticsMetrics.currentVelocity}</div>
-                    <div className="text-xs text-muted-foreground">Current Velocity</div>
-                </div>
-                <div className="flex items-center gap-1">
-                    {analyticsMetrics.velocityTrend === "up" ? (
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                    ) : (
-                    <TrendingDown className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className={`text-xs ${analyticsMetrics.velocityTrend === "up" ? "text-green-500" : "text-red-500"}`}>
-                    {analyticsMetrics.velocityChange}%
-                    </span>
-                </div>
-                </div>
-            </CardContent>
-        </Card>
-        <Card>
-            <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-blue-500" />
-                <div>
-                    <div className="text-2xl font-bold">{processedSprint.summaryMetrics.percentageComplete.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">Sprint Progress</div>
-                </div>
-                </div>
-            </CardContent>
-        </Card>
-        <Card>
-            <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-orange-500" />
-                <div>
-                    <div className="text-2xl font-bold">{processedSprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
-                    <div className="text-xs text-muted-foreground">Remaining Work</div>
-                </div>
-                </div>
-            </CardContent>
-        </Card>
-        <Card>
-            <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-500" />
-                <div>
-                    <div className="text-2xl font-bold">{analyticsMetrics.teamEfficiency}%</div>
-                    <div className="text-xs text-muted-foreground">Team Efficiency</div>
-                </div>
-                </div>
-            </CardContent>
-        </Card>
-      </section>
 
       <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
       
