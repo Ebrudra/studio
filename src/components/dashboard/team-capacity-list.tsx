@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -24,10 +23,11 @@ export function TeamCapacityList({ sprint }: TeamCapacityListProps) {
         const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
 
         return teamsInSprint.map(team => {
-          const teamTickets = sprint.tickets.filter(t => t.scope === team)
+          const teamTickets = (sprint.tickets || []).filter(t => t.scope === team)
           
-          const plannedBuild = sprint.teamCapacity[team]?.plannedBuild ?? 0;
-          const plannedRun = sprint.teamCapacity[team]?.plannedRun ?? 0;
+          const capacity = sprint.teamCapacity?.[team];
+          const plannedBuild = capacity?.plannedBuild ?? 0;
+          const plannedRun = capacity?.plannedRun ?? 0;
           
           const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
           const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
