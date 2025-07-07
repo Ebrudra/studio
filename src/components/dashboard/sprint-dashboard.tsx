@@ -3,7 +3,6 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { sprints as initialSprints, teams } from '@/lib/data';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
@@ -691,12 +690,10 @@ export default function SprintDashboard() {
                 </Select>
             </div>
             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><Plus className="mr-2 h-4 w-4" />New Sprint</Button>
-             <Link href={selectedSprintId ? `/report` : '#'} passHref>
-                <Button variant="outline" disabled={!selectedSprintId}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Report
-                </Button>
-            </Link>
+            <Button variant="outline" onClick={() => window.open(`/report?sprintId=${selectedSprintId}`, '_blank')} disabled={!selectedSprintId}>
+                <FileText className="mr-2 h-4 w-4" />
+                Generate Report
+            </Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon"><Settings className="h-4 w-4" /></Button>
@@ -839,5 +836,3 @@ export default function SprintDashboard() {
     </div>
   );
 }
-
-    
