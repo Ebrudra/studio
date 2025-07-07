@@ -41,6 +41,26 @@ export default function ReportPage() {
     setGeneratedAt(new Date());
   }, []);
 
+  const generateReport = React.useCallback(async (currentSprint: Sprint, sprints: Sprint[]) => {
+    setIsLoading(true)
+    setError("")
+    try {
+      const result = await generateSprintReport({ sprint: currentSprint, allSprints: sprints })
+      setReportContent(result.report)
+      
+      const updatedSprints = sprints.map(s => 
+        s.id === currentSprint.id ? { ...s, generatedReport: result.report } : s
+      )
+      localStorage.setItem('sprintPilotSprints', JSON.stringify(updatedSprints))
+      setGeneratedAt(new Date());
+
+    } catch (e: any) {
+      setError(`Failed to generate AI report: ${e.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!sprintId) {
       setError("No sprint ID provided.")
@@ -76,7 +96,7 @@ export default function ReportPage() {
       setError("Failed to load or parse sprint data from local storage.")
       setIsLoading(false)
     }
-  }, [sprintId])
+  }, [sprintId, generateReport])
 
   const reportData = React.useMemo(() => {
     if (!sprint) return null
@@ -108,11 +128,13 @@ export default function ReportPage() {
 
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
-                const delta = dailyDelta.get(log.date)
-                if (delta) {
-                    if(isBuild || isRun) delta.loggedHours += log.loggedHours
-                    if(isBuild) delta.loggedBuild += log.loggedHours
-                    if(isRun) delta.loggedRun += log.loggedHours
+                if (allTeams.includes(ticket.scope as Team)) {
+                    const delta = dailyDelta.get(log.date)
+                    if (delta) {
+                        if(isBuild || isRun) delta.loggedHours += log.loggedHours
+                        if(isBuild) delta.loggedBuild += log.loggedHours
+                        if(isRun) delta.loggedRun += log.loggedHours
+                    }
                 }
             }
         }
@@ -213,13 +235,16 @@ export default function ReportPage() {
 
     const dailyTotalSummary = dailyProgress.reduce((acc, day) => {
         allTeams.forEach(team => {
-            acc.build += day.progress[team].build;
-            acc.run += day.progress[team].run;
-            acc.buffer += day.progress[team].buffer;
+            if (day.progress[team]) {
+                acc.build += day.progress[team].build;
+                acc.run += day.progress[team].run;
+                acc.buffer += day.progress[team].buffer;
+            }
         });
         return acc;
     }, { build: 0, run: 0, buffer: 0 });
-    dailyTotalSummary.total = dailyTotalSummary.build + dailyTotalSummary.run + dailyTotalSummary.buffer;
+    const total = dailyTotalSummary.build + dailyTotalSummary.run + dailyTotalSummary.buffer
+    dailyTotalSummary.total = total;
 
     return {
       burndownData,
@@ -229,26 +254,6 @@ export default function ReportPage() {
       dailyTotalSummary,
     }
   }, [sprint])
-
-
-  const generateReport = async (currentSprint: Sprint, sprints: Sprint[]) => {
-    setIsLoading(true)
-    setError("")
-    try {
-      const result = await generateSprintReport({ sprint: currentSprint, allSprints: sprints })
-      setReportContent(result.report)
-      
-      const updatedSprints = sprints.map(s => 
-        s.id === currentSprint.id ? { ...s, generatedReport: result.report } : s
-      )
-      localStorage.setItem('sprintPilotSprints', JSON.stringify(updatedSprints))
-
-    } catch (e: any) {
-      setError(`Failed to generate AI report: ${e.message}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleExportPDF = () => {
     if (!reportRef.current) return
@@ -428,7 +433,7 @@ export default function ReportPage() {
                             <TableCell>Totals</TableCell>
                             <TableCell className="text-right">{reportData.teamTotals.planned.toFixed(1)}h</TableCell>
                             <TableCell className="text-right">{reportData.teamTotals.completed.toFixed(1)}h</TableCell>
-                            <TableCell colSpan={2} className="text-right">{((reportData.teamTotals.completed / reportData.teamTotals.planned) * 100).toFixed(1)}%</TableCell>
+                            <TableCell colSpan={2} className="text-right">{((reportData.teamTotals.completed / reportData.teamTotals.planned || 0) * 100).toFixed(1)}%</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
@@ -457,6 +462,10 @@ export default function ReportPage() {
                   )}
               </div>
               <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => sprint && allSprints.length && generateReport(sprint, allSprints)} disabled={isLoading || !!error || !sprint}>
+                    <Brain className="w-4 h-4 mr-2" />
+                    { isLoading ? 'Generating...' : 'Regenerate Analysis' }
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading || !!error}>
                   <Download className="w-4 h-4 mr-2" />
                   Export PDF
@@ -483,3 +492,5 @@ export default function ReportPage() {
     </div>
   )
 }
+
+    
