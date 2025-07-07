@@ -200,9 +200,11 @@ export default function ReportPage() {
         sprint.tickets.forEach(ticket => {
             ticket.dailyLogs?.forEach(log => {
                 if (log.date === dayInfo.date) {
-                    if (ticket.typeScope === 'Build') progress[ticket.scope].build += log.loggedHours;
-                    else if (ticket.typeScope === 'Run') progress[ticket.scope].run += log.loggedHours;
-                    else if (ticket.typeScope === 'Sprint') progress[ticket.scope].buffer += log.loggedHours;
+                    if (progress[ticket.scope]) {
+                      if (ticket.typeScope === 'Build') progress[ticket.scope].build += log.loggedHours;
+                      else if (ticket.typeScope === 'Run') progress[ticket.scope].run += log.loggedHours;
+                      else if (ticket.typeScope === 'Sprint') progress[ticket.scope].buffer += log.loggedHours;
+                    }
                 }
             })
         })
