@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Download, FileText, AlertCircle, Brain, Target, CheckCircle, Zap, Users, Clock, Award } from "lucide-react"
+import { Download, FileText, AlertCircle, Brain, Target, CheckCircle, Zap, Users, Clock, Award, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
@@ -35,6 +35,11 @@ export default function ReportPage() {
   const [reportContent, setReportContent] = React.useState<string>("")
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string>("")
+  const [generatedAt, setGeneratedAt] = React.useState<Date | null>(null)
+
+  React.useEffect(() => {
+    setGeneratedAt(new Date());
+  }, []);
 
   React.useEffect(() => {
     if (!sprintId) {
@@ -289,24 +294,6 @@ export default function ReportPage() {
     document.body.removeChild(link)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Excellent": return "bg-green-100 text-green-800";
-      case "Good": return "bg-blue-100 text-blue-800";
-      case "Behind": return "bg-orange-100 text-orange-800";
-      default: return "bg-red-100 text-red-800";
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Excellent": return <Award className="w-4 h-4 text-green-600" />;
-      case "Good": return <CheckCircle className="w-4 h-4 text-blue-600" />;
-      case "Behind": return <AlertTriangle className="w-4 h-4 text-orange-600" />;
-      default: return <Clock className="w-4 h-4 text-gray-600" />;
-    }
-  }
-
   const renderContent = () => {
     if (isLoading || !reportData) {
       return (
@@ -453,42 +440,44 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="p-6 bg-background" ref={reportRef}>
-        <div className="max-w-6xl mx-auto space-y-8">
-            <div className="border-b pb-6">
-                <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">
-                        {sprint ? `Sprint Report: ${sprint.name}` : 'Sprint Report'}
-                    </h1>
-                    {sprint && (
-                        <p className="text-gray-600 mt-1">
-                        {new Date(sprint.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} - {new Date(sprint.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}
-                        </p>
-                    )}
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading || !!error}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading || !!error}>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Export CSV
-                    </Button>
-                </div>
-                </div>
-            </div>
-            
-            {renderContent()}
-            
-            <div className="border-t pt-6 text-center text-sm text-gray-500">
+    <div className="p-6 bg-background">
+      <div className="max-w-6xl mx-auto space-y-8" ref={reportRef}>
+          <div className="border-b pb-6">
+              <div className="flex items-center justify-between mb-4">
+              <div>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                      {sprint ? `Sprint Report: ${sprint.name}` : 'Sprint Report'}
+                  </h1>
+                  {sprint && (
+                      <p className="text-gray-600 mt-1">
+                      {new Date(sprint.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} - {new Date(sprint.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+                      </p>
+                  )}
+              </div>
+              <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading || !!error}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading || !!error}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export CSV
+                  </Button>
+              </div>
+              </div>
+          </div>
+          
+          {renderContent()}
+          
+          <div className="border-t pt-6 text-center text-sm text-gray-500">
+            {generatedAt && (
                 <p>
-                Report generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                Report generated on {generatedAt.toLocaleDateString()} at {generatedAt.toLocaleTimeString()}
                 </p>
-                <p className="mt-1">Sprint Tracking Tool v2.0 with AI Intelligence | Confidential</p>
-            </div>
-        </div>
+            )}
+            <p className="mt-1">Sprint Tracking Tool v2.0 with AI Intelligence | Confidential</p>
+          </div>
+      </div>
     </div>
   )
 }
