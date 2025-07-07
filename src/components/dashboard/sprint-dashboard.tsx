@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { sprints as initialSprints, teams } from '@/lib/data';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
@@ -27,7 +28,6 @@ import { columns } from './columns';
 import { NewSprintDialog } from './new-sprint-dialog';
 import { EditSprintDialog } from './edit-sprint-dialog';
 import { AddTaskDialog } from './add-task-dialog';
-import { GenerateSprintReportDialog } from './generate-sprint-report-dialog';
 import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
@@ -45,7 +45,6 @@ export default function SprintDashboard() {
   const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
   const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [isReportOpen, setIsReportOpen] = useState(false);
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
   const [taskToLog, setTaskToLog] = useState<Ticket | null>(null);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -303,18 +302,20 @@ export default function SprintDashboard() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    updateSprints(prevSprints =>
-      prevSprints.map(sprint =>
-        sprint.id === selectedSprintId
-          ? {
-              ...sprint,
-              tickets: sprint.tickets.filter(t => t.id !== taskId),
-              lastUpdatedAt: new Date().toISOString(),
-            }
-          : sprint
-      )
-    );
-    toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
+    if(window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)){
+        updateSprints(prevSprints =>
+        prevSprints.map(sprint =>
+            sprint.id === selectedSprintId
+            ? {
+                ...sprint,
+                tickets: sprint.tickets.filter(t => t.id !== taskId),
+                lastUpdatedAt: new Date().toISOString(),
+                }
+            : sprint
+        )
+        );
+        toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
+    }
   };
   
   const handleLogRowAction = (task: Ticket) => {
@@ -555,13 +556,24 @@ export default function SprintDashboard() {
       toast({ title: "Sprint Completed", description: "The sprint has been archived." });
     }
   };
-  
-  const handleSaveReport = (report: string) => {
-      updateSprints(
-          prev => prev.map(s => s.id === selectedSprintId ? { ...s, generatedReport: report, lastUpdatedAt: new Date().toISOString() } : s)
-      );
+
+  const handleDeleteSprint = () => {
+    if (!selectedSprintId) return;
+    if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
+      updateSprints(prevSprints => {
+          const newSprints = prevSprints.filter(s => s.id !== selectedSprintId);
+          if (newSprints.length > 0) {
+            const latestSprint = newSprints.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+            setSelectedSprintId(latestSprint.id);
+          } else {
+            setSelectedSprintId(undefined);
+          }
+          return newSprints;
+      });
+      toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
+    }
   };
-  
+
   const tableData = useMemo(() => {
     if (!processedSprint) return [];
 
@@ -656,7 +668,6 @@ export default function SprintDashboard() {
        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
        {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={handleUpdateSprint} />}
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
-       <GenerateSprintReportDialog isOpen={isReportOpen} setIsOpen={setIsReportOpen} sprint={selectedSprint} onSaveReport={handleSaveReport} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
        <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUploadTasks} onBulkLogProgress={handleBulkLogProgress} />
 
@@ -679,7 +690,13 @@ export default function SprintDashboard() {
                     </SelectContent>
                 </Select>
             </div>
-             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><Plus className="mr-2 h-4 w-4" />New Sprint</Button>
+            <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><Plus className="mr-2 h-4 w-4" />New Sprint</Button>
+             <Link href={selectedSprintId ? `/report` : '#'} passHref>
+                <Button variant="outline" disabled={!selectedSprintId}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Report
+                </Button>
+            </Link>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon"><Settings className="h-4 w-4" /></Button>
@@ -694,6 +711,9 @@ export default function SprintDashboard() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleClearData} className="text-destructive" disabled={isSprintCompleted}>
                         <Trash2 className="mr-2 h-4 w-4" /> Clear Sprint Data
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDeleteSprint} className="text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete Sprint
                     </DropdownMenuItem>
                 </DropdownMenuContent>
              </DropdownMenu>
@@ -798,10 +818,6 @@ export default function SprintDashboard() {
                             <Plus className="w-4 h-4 mr-2" />
                             Add Task
                         </Button>
-                        <Button onClick={() => setIsReportOpen(true)} variant="outline" size="sm" disabled={!processedSprint.tickets.length}>
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            {selectedSprint.generatedReport ? "View Report" : "Generate Report"}
-                        </Button>
                     </div>
                     </div>
                 </CardHeader>
@@ -824,3 +840,4 @@ export default function SprintDashboard() {
   );
 }
 
+    
