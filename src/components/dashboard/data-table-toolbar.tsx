@@ -2,7 +2,7 @@
 "use client"
 
 import { Table } from "@tanstack/react-table"
-import { Filter, X, List, LayoutGrid, Kanban } from "lucide-react"
+import { Filter, X, List, LayoutGrid, Kanban, Group } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,14 +14,26 @@ interface DataTableToolbarProps<TData> {
   table: Table<TData>,
   viewMode: 'list' | 'cards' | 'kanban'
   onViewModeChange: (mode: 'list' | 'cards' | 'kanban') => void
+  groupBy: 'status' | 'scope' | 'day' | null
+  onGroupByChange: (value: 'status' | 'scope' | 'day' | null) => void
 }
 
 export function DataTableToolbar<TData>({
   table,
   viewMode,
   onViewModeChange,
+  groupBy,
+  onGroupByChange,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
+
+  const handleGroupByChange = (value: string) => {
+    if (value === 'none') {
+        onGroupByChange(null);
+    } else {
+        onGroupByChange(value as 'status' | 'scope' | 'day');
+    }
+  }
 
   return (
     <div className="flex items-center justify-between">
@@ -60,15 +72,18 @@ export function DataTableToolbar<TData>({
             </SelectContent>
         </Select>
          <Select
-            value={(table.getColumn("typeScope")?.getFilterValue() as string) ?? "all"}
-            onValueChange={(value) => table.getColumn("typeScope")?.setFilterValue(value === "all" ? null : value)}
+            value={groupBy || 'none'}
+            onValueChange={handleGroupByChange}
         >
-            <SelectTrigger className="w-40 h-8">
-                <SelectValue placeholder="Type Scope" />
+            <SelectTrigger className="w-48 h-8">
+                <Group className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Group by" />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">All Type Scopes</SelectItem>
-                {typeScopes.map(ts => <SelectItem key={ts.value} value={ts.value}>{ts.label}</SelectItem>)}
+                <SelectItem value="none">No Grouping</SelectItem>
+                <SelectItem value="status">Group by Status</SelectItem>
+                <SelectItem value="scope">Group by Scope</SelectItem>
+                <SelectItem value="day">Group by Day Logged</SelectItem>
             </SelectContent>
         </Select>
         {isFiltered && (

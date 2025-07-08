@@ -8,25 +8,41 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Edit, Trash2, Clock, User, Target, AlertTriangle } from "lucide-react"
-import type { Ticket } from "@/types"
+import { MoreHorizontal, Edit, Trash2, Clock, User, Target, AlertTriangle, Calendar } from "lucide-react"
+import type { Sprint, Ticket } from "@/types"
 import { statuses, scopes } from "./data"
 import { EditTaskDialog } from "./edit-task-dialog"
 
 interface TaskCardProps {
     task: Ticket
+    sprint: Sprint
     isSprintCompleted: boolean
     onUpdateTask: (task: Ticket) => void
     onDeleteTask: (taskId: string) => void
     onLogTime: (task: Ticket) => void
 }
 
-export function TaskCard({ task, isSprintCompleted, onUpdateTask, onDeleteTask, onLogTime }: TaskCardProps) {
+export function TaskCard({ task, sprint, isSprintCompleted, onUpdateTask, onDeleteTask, onLogTime }: TaskCardProps) {
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
     const statusInfo = statuses.find(s => s.value === task.status)
     const scopeInfo = scopes.find(s => s.value === task.scope)
     const progress = task.estimation > 0 ? (task.timeLogged / task.estimation) * 100 : (task.timeLogged > 0 ? 100 : 0)
     const isOverEstimation = task.timeLogged > task.estimation && task.estimation > 0
+
+    const sprintDayMap = React.useMemo(() => {
+        const map = new Map<string, number>();
+        sprint.sprintDays.forEach(d => map.set(d.date, d.day));
+        return map;
+    }, [sprint.sprintDays]);
+    
+    const loggedDays = React.useMemo(() => {
+        if (!task.dailyLogs || !sprintDayMap) return "";
+        return task.dailyLogs
+            .map(log => sprintDayMap.get(log.date))
+            .filter(Boolean)
+            .map(day => `D${day}`)
+            .join(', ');
+    }, [task.dailyLogs, sprintDayMap]);
 
     const handleDelete = () => {
         if(window.confirm(`Are you sure you want to delete task: ${task.id}? This action cannot be undone.`)){
@@ -111,6 +127,14 @@ export function TaskCard({ task, isSprintCompleted, onUpdateTask, onDeleteTask, 
                             <Target className="w-3.5 h-3.5" />
                             <span>{scopeInfo?.label || task.scope}</span>
                         </div>
+                         <div className="flex items-center gap-2 text-muted-foreground">
+                            {loggedDays && (
+                                <>
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span>{loggedDays}</span>
+                                </>
+                            )}
+                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                             {isOverEstimation && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                             <Clock className="w-3.5 h-3.5" />
