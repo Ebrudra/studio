@@ -2,8 +2,8 @@
 "use client";
 
 import * as React from 'react';
-import { useMemo, useState, useEffect } from 'react';
-import { sprints as initialSprints, teams } from '@/lib/data';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { teams } from '@/lib/data';
 import { assigneeConfig } from '@/lib/config';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
@@ -34,6 +34,7 @@ import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { InsightBulb } from './insight-bulb';
+import { getSprints, addSprint, updateSprint, deleteSprint as deleteSprintFromDb } from '@/lib/firebase/sprints';
 
 const SprintScopingView = ({
   sprint,
@@ -80,10 +81,8 @@ const SprintScopingView = ({
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [previousSprints, setPreviousSprints] = useState<Sprint[] | null>(null);
   const [selectedSprintId, setSelectedSprintId] = useState<string | undefined>();
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
   const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
@@ -94,54 +93,36 @@ export default function SprintDashboard() {
 
   const { toast } = useToast();
 
-  useEffect(() => {
+  const fetchSprints = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const storedSprints = localStorage.getItem('sprintPilotSprints');
-      if (storedSprints) {
-        setSprints(JSON.parse(storedSprints));
-      } else {
-        setSprints(initialSprints);
+      const sprintsFromDb = await getSprints();
+      setSprints(sprintsFromDb);
+      if (!selectedSprintId && sprintsFromDb.length > 0) {
+        setSelectedSprintId(sprintsFromDb[0].id);
+      } else if (sprintsFromDb.length === 0) {
+        setSelectedSprintId(undefined);
       }
-    } catch (error) {
-        console.error("Failed to load sprints from localStorage", error);
-        setSprints(initialSprints); // Fallback to initial data on error
+    } catch (err) {
+      console.error("Failed to fetch sprints:", err);
+      toast({ variant: "destructive", title: "Error", description: "Could not load sprints from the database." });
     } finally {
-        setIsLoaded(true);
+      setIsLoading(false);
     }
-  }, []);
+  }, [selectedSprintId, toast]);
 
   useEffect(() => {
-    if (isLoaded) {
-      try {
-        localStorage.setItem('sprintPilotSprints', JSON.stringify(sprints));
-      } catch (error) {
-        console.error("Failed to save sprints to localStorage", error);
-      }
-    }
-  }, [sprints, isLoaded]);
+    fetchSprints();
+  }, [fetchSprints]);
   
-  useEffect(() => {
-    if (isLoaded && !selectedSprintId && sprints.length > 0) {
-      const latestSprint = sprints.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
-      setSelectedSprintId(latestSprint.id);
-    }
-  }, [sprints, isLoaded, selectedSprintId]);
-
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
     [sprints, selectedSprintId]
   );
   
-  useEffect(() => {
-    if (selectedSprint) {
-      setLastUpdated(new Date(selectedSprint.lastUpdatedAt));
-    }
-  }, [selectedSprint]);
-
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    // NOTE: This ensures display is always correct, but the underlying data is mutated in handlers
     const tickets = selectedSprint.tickets.map(ticket => 
         (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
@@ -173,7 +154,7 @@ export default function SprintDashboard() {
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
                 if (!dataByDate.has(log.date)) {
-                    dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: number }>));
+                    dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
                 if(dayData[ticket.platform]) {
@@ -192,7 +173,7 @@ export default function SprintDashboard() {
     return (selectedSprint.sprintDays || []).map(dayInfo => ({
         day: dayInfo.day,
         date: dayInfo.date,
-        progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number; buffer: 0 }>)
+        progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>)
     }));
   }, [selectedSprint]);
 
@@ -269,50 +250,33 @@ export default function SprintDashboard() {
     }
 
   }, [sprints, selectedSprint, processedSprint]);
-
-  const updateSprints = (updateFn: (sprints: Sprint[]) => Sprint[]) => {
-    setSprints(currentSprints => {
-        const newSprints = updateFn(currentSprints);
-        return newSprints;
-    });
-  };
-
-  const handleBulkUpdate = (updateFn: (sprints: Sprint[]) => Sprint[], toastInfo: { title: string, description: string }) => {
-    setPreviousSprints(sprints);
-    updateSprints(updateFn);
-    toast(toastInfo);
-  }
-
-  const handleRollback = () => {
-    if (previousSprints) {
-      setSprints(previousSprints);
-      setPreviousSprints(null);
-      toast({ title: "Rollback successful", description: "The last data import has been undone." });
-    }
-  }
-
-  const handleCreateSprint = (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'generatedReport'>) => {
-    const newSprint: Sprint = {
+  
+  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
+    const newSprint: Omit<Sprint, 'id'> = {
       ...newSprintData,
-      id: `sprint-${sprints.length + 1}-${Date.now()}`,
-      lastUpdatedAt: new Date().toISOString(),
       tickets: [],
       generatedReport: undefined,
     };
-    updateSprints(prevSprints => [...prevSprints, newSprint]);
-    setSelectedSprintId(newSprint.id);
+    const newId = await addSprint(newSprint);
+    await fetchSprints();
+    setSelectedSprintId(newId);
   };
   
-  const handleUpdateSprint = (updatedSprintData: Sprint) => {
-    updateSprints(prevSprints =>
-        prevSprints.map(sprint =>
-            sprint.id === updatedSprintData.id ? updatedSprintData : sprint
-        )
-    );
+  const handleUpdateSprint = async (updatedSprintData: Sprint) => {
+    await updateSprint(updatedSprintData.id, updatedSprintData);
+    await fetchSprints();
     toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
   };
 
-  const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
+  const updateSelectedSprint = async (updatedData: Partial<Omit<Sprint, 'id'>>) => {
+    if (!selectedSprintId) return;
+    const dataToUpdate = { ...updatedData, lastUpdatedAt: new Date().toISOString() };
+    await updateSprint(selectedSprintId, dataToUpdate);
+    await fetchSprints();
+  }
+
+  const handleAddTask = async (newTaskData: Omit<Ticket, "timeLogged">) => {
+    if (!selectedSprint) return;
     const isOutOfScope = selectedSprint?.status === 'Active' && newTaskData.typeScope === 'Build';
     const newTask: Ticket = {
       ...newTaskData,
@@ -322,46 +286,24 @@ export default function SprintDashboard() {
       creationDate: new Date().toISOString().split('T')[0],
       isOutOfScope,
     };
-
-    updateSprints(prevSprints =>
-      prevSprints.map(sprint =>
-        sprint.id === selectedSprintId
-          ? { ...sprint, tickets: [...sprint.tickets, newTask], lastUpdatedAt: new Date().toISOString() }
-          : sprint
-      )
-    );
+    await updateSelectedSprint({ tickets: [...selectedSprint.tickets, newTask] });
   };
 
-  const handleUpdateTask = (updatedTask: Ticket) => {
-    updateSprints(prevSprints =>
-      prevSprints.map(sprint => {
-        if (sprint.id !== selectedSprintId) return sprint;
-        
-        const finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
-
-        if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
-          finalTask.estimation = finalTask.timeLogged;
-        }
-
-        const newTickets = sprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
-        return { ...sprint, tickets: newTickets, lastUpdatedAt: new Date().toISOString() };
-      })
-    );
+  const handleUpdateTask = async (updatedTask: Ticket) => {
+    if (!selectedSprint) return;
+    const finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
+    if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
+      finalTask.estimation = finalTask.timeLogged;
+    }
+    const newTickets = selectedSprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
+    await updateSelectedSprint({ tickets: newTickets });
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
+    if (!selectedSprint) return;
     if(window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)){
-        updateSprints(prevSprints =>
-        prevSprints.map(sprint =>
-            sprint.id === selectedSprintId
-            ? {
-                ...sprint,
-                tickets: sprint.tickets.filter(t => t.id !== taskId),
-                lastUpdatedAt: new Date().toISOString(),
-                }
-            : sprint
-        )
-        );
+        const newTickets = selectedSprint.tickets.filter(t => t.id !== taskId);
+        await updateSelectedSprint({ tickets: newTickets });
         toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
     }
   };
@@ -371,100 +313,91 @@ export default function SprintDashboard() {
     setIsLogProgressOpen(true);
   };
 
-  const handleLogProgress = (data: LogProgressData) => {
-    updateSprints(prevSprints =>
-      prevSprints.map(sprint => {
-        if (sprint.id !== selectedSprintId) return sprint;
+  const handleLogProgress = async (data: LogProgressData) => {
+    if (!selectedSprint) return;
 
-        let newTickets = [...sprint.tickets];
-        const isNewTicket = data.ticketId === 'new-ticket';
-        const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
-        let ticket = newTickets.find(t => t.id === ticketId);
-        
-        const dayNumber = parseInt(data.day.replace('D', ''), 10);
-        const logDate = sprint.sprintDays.find(d => d.day === dayNumber)?.date;
-        if (!logDate) return sprint; // Should not happen if UI is correct
+    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets));
+    const isNewTicket = data.ticketId === 'new-ticket';
+    const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
+    let ticket = newTickets.find((t: Ticket) => t.id === ticketId);
+    
+    const dayNumber = parseInt(data.day.replace('D', ''), 10);
+    const logDate = selectedSprint.sprintDays.find(d => d.day === dayNumber)?.date;
+    if (!logDate) return;
 
-        const newLog: DailyLog = {
-          date: logDate,
-          loggedHours: data.loggedHours,
-        };
+    const newLog: DailyLog = {
+      date: logDate,
+      loggedHours: data.loggedHours,
+    };
 
-        if (isNewTicket) {
-          const isOutOfScope = sprint.status === 'Active' && data.typeScope === 'Build';
-          const newTicket: Ticket = {
-            id: ticketId,
-            title: data.newTicketTitle || data.newTicketId!,
-            platform: data.platform,
-            type: data.type,
-            typeScope: data.typeScope,
-            estimation: data.estimation,
-            status: data.status,
-            dailyLogs: [newLog],
-            timeLogged: newLog.loggedHours,
-            creationDate: new Date(logDate).toISOString().split('T')[0],
-            description: data.description,
-            tags: data.tags,
-            assignee: assigneeConfig[data.platform],
-            isOutOfScope,
-          };
-          if (newTicket.type === 'Bug' || newTicket.type === 'Buffer') {
-            newTicket.estimation = newTicket.timeLogged;
-          }
-          if (newTicket.status === 'Done') {
-            newTicket.completionDate = new Date(logDate).toISOString().split('T')[0];
-          }
-          newTickets.push(newTicket);
-        } else if (ticket) {
-          const newDailyLogs = [...(ticket.dailyLogs || [])];
-          const existingLogIndex = newDailyLogs.findIndex(l => l.date === logDate);
+    if (isNewTicket) {
+      const isOutOfScope = selectedSprint.status === 'Active' && data.typeScope === 'Build';
+      const newTicketToAdd: Ticket = {
+        id: ticketId,
+        title: data.newTicketTitle || data.newTicketId!,
+        platform: data.platform,
+        type: data.type,
+        typeScope: data.typeScope,
+        estimation: data.estimation,
+        status: data.status,
+        dailyLogs: [newLog],
+        timeLogged: newLog.loggedHours,
+        creationDate: new Date(logDate).toISOString().split('T')[0],
+        description: data.description,
+        tags: data.tags,
+        assignee: assigneeConfig[data.platform],
+        isOutOfScope,
+      };
+      if (newTicketToAdd.type === 'Bug' || newTicketToAdd.type === 'Buffer') {
+        newTicketToAdd.estimation = newTicketToAdd.timeLogged;
+      }
+      if (newTicketToAdd.status === 'Done') {
+        newTicketToAdd.completionDate = new Date(logDate).toISOString().split('T')[0];
+      }
+      newTickets.push(newTicketToAdd);
+    } else if (ticket) {
+      const newDailyLogs = [...(ticket.dailyLogs || [])];
+      const existingLogIndex = newDailyLogs.findIndex(l => l.date === logDate);
 
-          if (existingLogIndex !== -1) {
-            newDailyLogs[existingLogIndex].loggedHours += data.loggedHours;
-          } else {
-            newDailyLogs.push(newLog);
-          }
-          
-          const timeLogged = newDailyLogs.reduce((acc, log) => acc + log.loggedHours, 0);
-          const wasDone = ticket.status === 'Done';
-          const isDone = data.status === 'Done';
+      if (existingLogIndex !== -1) {
+        newDailyLogs[existingLogIndex].loggedHours += data.loggedHours;
+      } else {
+        newDailyLogs.push(newLog);
+      }
+      
+      const timeLogged = newDailyLogs.reduce((acc, log) => acc + log.loggedHours, 0);
+      const wasDone = ticket.status === 'Done';
+      const isDone = data.status === 'Done';
 
-          let updatedTicket: Ticket = { ...ticket, status: data.status, dailyLogs: newDailyLogs, timeLogged };
-          
-          if (updatedTicket.type === 'Bug' || updatedTicket.type === 'Buffer') {
-            updatedTicket.estimation = timeLogged;
-          }
+      ticket.status = data.status;
+      ticket.dailyLogs = newDailyLogs;
+      ticket.timeLogged = timeLogged;
+      
+      if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
+        ticket.estimation = timeLogged;
+      }
 
-          if (!wasDone && isDone) {
-            updatedTicket.completionDate = new Date(logDate).toISOString().split('T')[0];
-          } else if (wasDone && !isDone) {
-            delete updatedTicket.completionDate;
-          }
-          
-          newTickets = newTickets.map(t => t.id === ticketId ? updatedTicket : t);
-        }
-
-        return { ...sprint, tickets: newTickets, lastUpdatedAt: new Date().toISOString() };
-      })
-    );
+      if (!wasDone && isDone) {
+        ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
+      } else if (wasDone && !isDone) {
+        delete ticket.completionDate;
+      }
+    }
+    await updateSelectedSprint({ tickets: newTickets });
   };
   
-  const handleBulkUploadTasks = (tasks: BulkTask[]) => {
-    let addedCount = 0;
-    const updateFn = (prevSprints: Sprint[]) => {
-      const sprintToUpdate = prevSprints.find(s => s.id === selectedSprintId);
-      if (!sprintToUpdate) return prevSprints;
-
-      const existingTicketIds = new Set(sprintToUpdate.tickets.map(t => t.id));
-      const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
-      addedCount = uniqueNewTickets.length;
-
-      const newTickets: Ticket[] = uniqueNewTickets.map(task => {
+  const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
+    if (!selectedSprint) return;
+    const existingTicketIds = new Set(selectedSprint.tickets.map(t => t.id));
+    const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
+    const addedCount = uniqueNewTickets.length;
+    
+    const newTickets: Ticket[] = uniqueNewTickets.map(task => {
         let typeScope: TicketTypeScope = 'Build';
         if (task.type === 'Bug') typeScope = 'Run';
         else if (task.type === 'Buffer') typeScope = 'Sprint';
 
-        const isOutOfScope = sprintToUpdate.status === 'Active' && typeScope === 'Build';
+        const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
         const canonicalPlatform = teams.find(t => t.toLowerCase() === task.platform.toLowerCase()) || 'Web';
         const estimation = Number(task.estimation) || 0;
         const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
@@ -487,166 +420,144 @@ export default function SprintDashboard() {
         };
       });
 
-      if (newTickets.length > 0) {
-        return prevSprints.map(s => s.id === selectedSprintId ? { ...s, tickets: [...s.tickets, ...newTickets], lastUpdatedAt: new Date().toISOString() } : s);
-      }
-      return prevSprints;
-    };
-    handleBulkUpdate(updateFn, { title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
+    if (newTickets.length > 0) {
+      await updateSelectedSprint({ tickets: [...selectedSprint.tickets, ...newTickets]});
+    }
+    toast({ title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
   };
 
-  const handleBulkLogProgress = (logs: BulkProgressLog[]) => {
+  const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
+    if (!selectedSprint) return;
     let processedCount = 0;
     let newTicketsCount = 0;
-
-    const updateFn = (prevSprints: Sprint[]) => {
-      const newSprints: Sprint[] = JSON.parse(JSON.stringify(prevSprints));
-      const sprintToUpdate = newSprints.find(s => s.id === selectedSprintId);
-      if (!sprintToUpdate) return prevSprints;
-      
-      const dayToDateMap = new Map<number, string>();
-      (sprintToUpdate.sprintDays || []).forEach(d => dayToDateMap.set(d.day, d.date));
-      
-      logs.sort((a, b) => {
-          const dayA = parseInt(a.day?.replace('D', '') || '0', 10);
-          const dayB = parseInt(b.day?.replace('D', '') || '0', 10);
-          return dayA - dayB;
-      });
-
-      for (const log of logs) {
-        if (!log.ticketId || !log.day || !log.loggedHours || !log.status) continue;
-        
-        const dayNumber = parseInt(log.day.replace('D', ''), 10);
-        if (isNaN(dayNumber)) continue;
-        
-        const logDate = dayToDateMap.get(dayNumber);
-        if (!logDate) continue;
-
-        let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
-
-        if (!ticket) {
-          if (!log.platform || !log.type) continue;
-          
-          let typeScope: TicketTypeScope = log.typeScope || 'Build';
-          if (log.type === 'Bug') typeScope = 'Run';
-          else if (log.type === 'Buffer') typeScope = 'Sprint';
-          else if (log.type === 'User story') typeScope = 'Build';
-          
-          const isOutOfScope = sprintToUpdate.status === 'Active' && typeScope === 'Build';
-          const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
-          const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Web';
-          const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-
-          ticket = {
-            id: log.ticketId,
-            title: log.title || log.ticketId,
-            description: log.description,
-            platform: canonicalPlatform,
-            type: log.type,
-            typeScope: typeScope,
-            estimation: estimation,
-            status: 'To Do',
-            timeLogged: 0,
-            dailyLogs: [],
-            isOutOfScope,
-            creationDate: new Date(logDate).toISOString().split('T')[0],
-            assignee: assigneeConfig[canonicalPlatform],
-            tags: tags,
-          };
-          sprintToUpdate.tickets.push(ticket);
-          newTicketsCount++;
-        }
-
-        if (!ticket.dailyLogs) {
-          ticket.dailyLogs = [];
-        }
-
-        const newLog: DailyLog = { date: logDate, loggedHours: Number(log.loggedHours) || 0 };
-        const existingLogIndex = ticket.dailyLogs.findIndex(l => l.date === logDate);
-
-        if (existingLogIndex > -1) {
-          ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
-        } else {
-          ticket.dailyLogs.push(newLog);
-        }
-
-        ticket.status = log.status;
-        const wasDone = !!ticket.completionDate;
-        const isDone = log.status === 'Done';
-
-        if (!wasDone && isDone) {
-          ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
-        } else if (wasDone && !isDone) {
-          delete ticket.completionDate;
-        }
-
-        processedCount++;
-      }
-      
-      sprintToUpdate.tickets.forEach((ticket: Ticket) => {
-          if (ticket.dailyLogs) {
-              ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
-              if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
-                  ticket.estimation = ticket.timeLogged;
-              }
-          }
-      });
-
-      sprintToUpdate.lastUpdatedAt = new Date().toISOString();
-      return newSprints;
-    };
     
-    handleBulkUpdate(updateFn, {
+    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets));
+    const dayToDateMap = new Map<number, string>();
+    (selectedSprint.sprintDays || []).forEach(d => dayToDateMap.set(d.day, d.date));
+      
+    logs.sort((a, b) => {
+        const dayA = parseInt(a.day?.replace('D', '') || '0', 10);
+        const dayB = parseInt(b.day?.replace('D', '') || '0', 10);
+        return dayA - dayB;
+    });
+
+    for (const log of logs) {
+      if (!log.ticketId || !log.day || !log.loggedHours || !log.status) continue;
+      
+      const dayNumber = parseInt(log.day.replace('D', ''), 10);
+      if (isNaN(dayNumber)) continue;
+      
+      const logDate = dayToDateMap.get(dayNumber);
+      if (!logDate) continue;
+
+      let ticket = newTickets.find((t: Ticket) => t.id === log.ticketId);
+
+      if (!ticket) {
+        if (!log.platform || !log.type) continue;
+        
+        let typeScope: TicketTypeScope = log.typeScope || 'Build';
+        if (log.type === 'Bug') typeScope = 'Run';
+        else if (log.type === 'Buffer') typeScope = 'Sprint';
+        else if (log.type === 'User story') typeScope = 'Build';
+        
+        const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
+        const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
+        const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Web';
+        const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+        ticket = {
+          id: log.ticketId,
+          title: log.title || log.ticketId,
+          description: log.description,
+          platform: canonicalPlatform,
+          type: log.type,
+          typeScope: typeScope,
+          estimation: estimation,
+          status: 'To Do',
+          timeLogged: 0,
+          dailyLogs: [],
+          isOutOfScope,
+          creationDate: new Date(logDate).toISOString().split('T')[0],
+          assignee: assigneeConfig[canonicalPlatform],
+          tags: tags,
+        };
+        newTickets.push(ticket);
+        newTicketsCount++;
+      }
+
+      if (!ticket.dailyLogs) {
+        ticket.dailyLogs = [];
+      }
+
+      const newLog: DailyLog = { date: logDate, loggedHours: Number(log.loggedHours) || 0 };
+      const existingLogIndex = ticket.dailyLogs.findIndex((l: DailyLog) => l.date === logDate);
+
+      if (existingLogIndex > -1) {
+        ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
+      } else {
+        ticket.dailyLogs.push(newLog);
+      }
+
+      ticket.status = log.status;
+      const wasDone = !!ticket.completionDate;
+      const isDone = log.status === 'Done';
+
+      if (!wasDone && isDone) {
+        ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
+      } else if (wasDone && !isDone) {
+        delete ticket.completionDate;
+      }
+
+      processedCount++;
+    }
+    
+    newTickets.forEach((ticket: Ticket) => {
+        if (ticket.dailyLogs) {
+            ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
+            if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
+                ticket.estimation = ticket.timeLogged;
+            }
+        }
+    });
+
+    await updateSelectedSprint({ tickets: newTickets });
+    toast({
       title: "Progress Log Upload Complete",
       description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
     });
   };
   
-  const handleClearData = () => {
+  const handleClearData = async () => {
     if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
-      updateSprints(
-        prev => prev.map(s => s.id === selectedSprintId ? { ...s, tickets: [], generatedReport: undefined, lastUpdatedAt: new Date().toISOString() } : s)
-      );
+      await updateSelectedSprint({ tickets: [], generatedReport: undefined });
       toast({ title: "Sprint Data Cleared", description: "All tickets and logs have been removed." });
     }
   };
 
-  const handleCompleteSprint = () => {
+  const handleCompleteSprint = async () => {
     if (window.confirm("Are you sure you want to complete this sprint? You will no longer be able to edit it.")) {
-      updateSprints(
-        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Completed', lastUpdatedAt: new Date().toISOString() } : s)
-      );
+      await updateSelectedSprint({ status: 'Completed' });
       toast({ title: "Sprint Completed", description: "The sprint has been archived." });
     }
   };
 
-  const handleDeleteSprint = () => {
-    if (!selectedSprintId) return;
+  const handleDeleteSprint = async () => {
+    if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
-      updateSprints(prevSprints => {
-          const newSprints = prevSprints.filter(s => s.id !== selectedSprintId);
-          if (newSprints.length > 0) {
-            const latestSprint = newSprints.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
-            setSelectedSprintId(latestSprint.id);
-          } else {
-            setSelectedSprintId(undefined);
-          }
-          return newSprints;
-      });
+      await deleteSprintFromDb(selectedSprintId);
+      await fetchSprints();
       toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
     }
   };
 
-  const handleFinalizeScope = () => {
+  const handleFinalizeScope = async () => {
     if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
-      updateSprints(
-        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Active', lastUpdatedAt: new Date().toISOString() } : s)
-      );
+      await updateSelectedSprint({ status: 'Active' });
       toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
     }
   };
 
-  if (!isLoaded) {
+  if (isLoading) {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
             <Skeleton className="h-12 w-1/3" />
@@ -709,9 +620,11 @@ export default function SprintDashboard() {
             {processedSprint.status === 'Active' && <Badge variant="default" className="text-base"><Zap className="mr-2 h-4 w-4" />Active</Badge>}
             {processedSprint.status === 'Scoping' && <Badge variant="secondary" className="text-base"><ListTodo className="mr-2 h-4 w-4" />Scoping</Badge>}
           </div>
-          <p className="text-sm text-muted-foreground">
-            Data last updated at: {lastUpdated ? lastUpdated.toLocaleString() : 'N/A'}
-          </p>
+          {selectedSprint.lastUpdatedAt &&
+            <p className="text-sm text-muted-foreground">
+                Data last updated at: {new Date(selectedSprint.lastUpdatedAt).toLocaleString()}
+            </p>
+          }
         </div>
         <div className="flex items-center gap-2">
             <div className="w-full sm:w-64">
@@ -859,7 +772,6 @@ export default function SprintDashboard() {
                               </CardTitle>
 
                               <div className="flex items-center gap-2">
-                                  {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
                                   <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
                                       <Upload className="w-4 h-4 mr-2" />
                                       Bulk Upload

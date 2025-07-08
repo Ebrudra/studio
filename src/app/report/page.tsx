@@ -23,6 +23,7 @@ import { generateSprintReport } from "@/ai/flows/sprint-report-flow"
 import { MarkdownRenderer } from "@/components/report/markdown-renderer"
 import { AIInsights } from "@/components/report/ai-insights"
 import { teams as allTeams } from "@/lib/data"
+import { getSprints, updateSprint } from "@/lib/firebase/sprints"
 
 
 export default function ReportPage() {
@@ -44,16 +45,14 @@ export default function ReportPage() {
   }, []);
 
   const generateReport = React.useCallback(async (currentSprint: Sprint, sprints: Sprint[]) => {
+    if (!sprintId) return;
     setIsLoading(true)
     setError("")
     try {
       const result = await generateSprintReport({ sprint: currentSprint, allSprints: sprints })
       setReportContent(result.report)
       
-      const updatedSprints = sprints.map(s => 
-        s.id === currentSprint.id ? { ...s, generatedReport: result.report } : s
-      )
-      localStorage.setItem('sprintPilotSprints', JSON.stringify(updatedSprints))
+      await updateSprint(sprintId, { generatedReport: result.report })
       setGeneratedAt(new Date());
 
     } catch (e: any) {
@@ -61,7 +60,7 @@ export default function ReportPage() {
     } finally {
       setIsLoading(false)
     }
-  }, []);
+  }, [sprintId]);
 
   React.useEffect(() => {
     if (!sprintId) {
@@ -70,34 +69,32 @@ export default function ReportPage() {
       return
     }
 
-    try {
-      const storedSprints = localStorage.getItem('sprintPilotSprints')
-      if (storedSprints) {
-        const sprints = JSON.parse(storedSprints) as Sprint[]
-        const currentSprint = sprints.find(s => s.id === sprintId)
+    const fetchReportData = async () => {
+        try {
+            const sprints = await getSprints();
+            const currentSprint = sprints.find(s => s.id === sprintId)
 
-        if (currentSprint) {
-          setSprint(currentSprint)
-          setAllSprints(sprints)
+            if (currentSprint) {
+                setSprint(currentSprint)
+                setAllSprints(sprints)
 
-          if (currentSprint.generatedReport) {
-            setReportContent(currentSprint.generatedReport)
+                if (currentSprint.generatedReport) {
+                    setReportContent(currentSprint.generatedReport)
+                    setIsLoading(false)
+                } else {
+                    generateReport(currentSprint, sprints)
+                }
+            } else {
+                setError(`Sprint with ID "${sprintId}" not found.`)
+                setIsLoading(false)
+            }
+        } catch (e) {
+            setError("Failed to load sprint data from the database.")
             setIsLoading(false)
-          } else {
-            generateReport(currentSprint, sprints)
-          }
-        } else {
-          setError(`Sprint with ID "${sprintId}" not found.`)
-          setIsLoading(false)
         }
-      } else {
-        setError("No sprint data found in local storage.")
-        setIsLoading(false)
-      }
-    } catch (e) {
-      setError("Failed to load or parse sprint data from local storage.")
-      setIsLoading(false)
     }
+    
+    fetchReportData();
   }, [sprintId, generateReport])
 
   const reportData = React.useMemo(() => {

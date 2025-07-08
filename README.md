@@ -1,6 +1,6 @@
 # SprintPilot
 
-This is a Next.js and Genkit application built in Firebase Studio.
+This is a Next.js and Genkit application built in Firebase Studio. It uses **Firebase Firestore** for data storage.
 
 ## Running Locally
 
@@ -18,19 +18,41 @@ Open your terminal, navigate into the project directory, and run the following c
 npm install
 ```
 
-### 3. Set Up Environment Variables
+### 3. Set Up a Firebase Project
 
-The application uses Genkit to connect to the Google Gemini API, which requires an API key.
+This application requires a Firebase project to use Firestore.
 
-1.  Get your free API key from **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
+1.  Go to the [Firebase Console](https://console.firebase.google.com/).
+2.  Click **"Add project"** and follow the on-screen instructions to create a new project.
+3.  Once your project is created, navigate to the **Project Overview** page. Click the **Web** icon (`</>`) to add a web app to your project.
+4.  Give your app a nickname and click **"Register app"**.
+5.  Firebase will provide you with a `firebaseConfig` object. You will need these values for the next step.
+6.  In your new project, go to the **Build** section in the left-hand menu and select **Firestore Database**.
+7.  Click **"Create database"**.
+8.  Choose to start in **"test mode"** (this allows easy read/write access for development) and select a location. Click **"Enable"**.
+
+### 4. Set Up Environment Variables
+
+The application needs your Firebase project configuration and a Google Gemini API key.
+
+1.  Get your free Gemini API key from **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
 2.  In the project's root directory, make a copy of the `.env` file and rename it to `.env.local`.
-3.  Open your new `.env.local` file and add your API key like this:
-
+3.  Open your new `.env.local` file.
+4.  Add your Gemini API key:
     ```
     GOOGLE_API_KEY=YOUR_API_KEY_HERE
     ```
+5.  Add your Firebase configuration values from Step 3:
+    ```
+    NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-auth-domain
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+    NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+    ```
 
-### 4. Run the Development Servers
+### 5. Run the Development Servers
 
 You will need to run two separate processes in two different terminal windows.
 
@@ -46,33 +68,10 @@ npm run dev
 npm run genkit:dev
 ```
 
-### 5. Open the App
+### 6. Open the App
 
 Once both servers are running, you can open your web browser and navigate to:
 
 [http://localhost:9002](http://localhost:9002)
 
-You should now see the application running locally!
-
-## Data Persistence & Deployment
-
-### Current State: Local Storage
-
-This application currently uses your browser's **local storage** to save sprint and task data. This is great for getting started quickly and running the app locally, but it has some limitations:
-- Data is only stored on your machine in your current browser.
-- It is not suitable for collaboration with a team.
-- Clearing your browser data will erase all your sprints.
-
-### Recommended Upgrade: Firebase Firestore
-
-For a robust, collaborative, and production-ready application, we recommend using a cloud database. **Firebase Firestore** is an excellent choice and is designed to work seamlessly with this tech stack.
-
-**Is it free?**
-Yes, Firebase has a very generous free tier called the **Spark Plan**. It includes:
-- A significant number of document reads, writes, and deletes per day.
-- A base level of cloud storage (typically 1 GiB).
-- A number of concurrent connections.
-
-For most small to medium-sized projects, the free tier is more than enough to get started and even run in production. You only have to consider the paid **Blaze Plan** if your app's usage grows significantly beyond these free limits.
-
-*Future steps would involve adding the Firebase SDK and updating the dashboard components to read from and write to Firestore instead of local storage.*
+You should now see the application running locally! You can start by creating your first sprint.
