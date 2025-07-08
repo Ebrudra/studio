@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { TaskTable } from './task-table';
+import { SprintTasksView } from './sprint-tasks-view';
 import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
@@ -48,8 +48,6 @@ export default function SprintDashboard() {
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
   const [taskToLog, setTaskToLog] = useState<Ticket | null>(null);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'byDay' | 'byTeam'>('list');
-
 
   const { toast } = useToast();
 
@@ -585,65 +583,6 @@ export default function SprintDashboard() {
     }
   };
 
-  const tableData = useMemo(() => {
-    if (!processedSprint) return [];
-
-    if (viewMode === 'list') {
-        return processedSprint.tickets;
-    }
-
-    if (viewMode === 'byDay') {
-        const groupedByDay: { [key: string]: Ticket[] } = {};
-        
-        processedSprint.tickets.forEach(ticket => {
-            ticket.dailyLogs?.forEach(log => {
-                if (!groupedByDay[log.date]) {
-                    groupedByDay[log.date] = [];
-                }
-                const ticketForDay = { ...ticket, dayLog: log };
-                
-                if (!groupedByDay[log.date].some(t => t.id === ticket.id)) {
-                    groupedByDay[log.date].push(ticketForDay);
-                }
-            });
-        });
-
-        const flatData: any[] = [];
-        const sprintDayMap = new Map((processedSprint.sprintDays || []).map((d) => [d.date, `Day ${d.day}`]));
-        const sortedDates = Object.keys(groupedByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-        sortedDates.forEach(date => {
-            const dayLabel = sprintDayMap.get(date) || 'Unknown Day';
-            flatData.push({ isGroupHeader: true, title: `${dayLabel} (${new Date(date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})` });
-            flatData.push(...groupedByDay[date]);
-        });
-        return flatData;
-    }
-    
-    if (viewMode === 'byTeam') {
-        const groupedByTeam: { [key in Team]?: Ticket[] } = {};
-        
-        processedSprint.tickets.forEach(ticket => {
-            if (!groupedByTeam[ticket.scope]) {
-                groupedByTeam[ticket.scope] = [];
-            }
-            groupedByTeam[ticket.scope].push(ticket);
-        });
-        
-        const flatData: any[] = [];
-        teams.forEach(team => {
-            if (groupedByTeam[team] && groupedByTeam[team]!.length > 0) {
-                flatData.push({ isGroupHeader: true, title: team });
-                flatData.push(...groupedByTeam[team]!);
-            }
-        })
-        return flatData;
-    }
-
-    return [];
-  }, [processedSprint, viewMode]);
-
-
   if (!isLoaded) {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -831,7 +770,7 @@ export default function SprintDashboard() {
                     </div>
                 </CardHeader>
               <CardContent>
-                  <TaskTable columns={columns} data={tableData} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} viewMode={viewMode} onViewModeChange={setViewMode} />
+                  <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
               </CardContent>
            </Card>
         </TabsContent>

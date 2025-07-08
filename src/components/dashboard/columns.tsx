@@ -156,32 +156,6 @@ export const columns: ColumnDef<Ticket>[] = [
     },
   },
   {
-    id: "loggedDays",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Logged Days" />
-    ),
-    cell: ({ row, table }) => {
-      const sprint = (table.options.meta as any)?.sprint;
-      if (!row.original.dailyLogs?.length || !sprint?.sprintDays) {
-        return null;
-      }
-      
-      const sprintDayMap = new Map(sprint.sprintDays.map((d: any) => [d.date, d.day]));
-
-      const loggedDayNumbers = row.original.dailyLogs.map(log => {
-        const dayNumber = sprintDayMap.get(log.date);
-        return dayNumber ? `D${dayNumber}` : null;
-      }).filter(Boolean).join(', ');
-
-      return (
-        <div className="flex items-center justify-center">
-          <span className="truncate max-w-[100px]">{loggedDayNumbers}</span>
-        </div>
-      )
-    },
-    enableSorting: false,
-  },
-  {
     id: "actions",
     cell: ({ row, table }) => {
        const { onUpdateTask, onDeleteTask, onLogTime, sprint } = table.options.meta as any;
