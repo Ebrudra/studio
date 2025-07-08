@@ -11,6 +11,36 @@ import { Ticket, TicketStatus, TicketTypeScope, Sprint } from "@/types"
 import { statuses } from "./data"
 import { cn } from "@/lib/utils"
 
+const getScopeDisplay = (ticket: Ticket) => {
+  switch (ticket.typeScope) {
+    case 'Build':
+      return 'Task/Build';
+    case 'Run':
+      return 'Bug/Run';
+    case 'Sprint':
+      return 'Buffer/Sprint';
+    default:
+      return '';
+  }
+}
+
+const getScopeBadgeVariant = (typeScope: TicketTypeScope) => {
+  switch (typeScope) {
+    case 'Build': return 'build';
+    case 'Run': return 'run';
+    case 'Sprint': return 'sprint';
+  }
+}
+
+const getStatusBadgeVariant = (status: TicketStatus) => {
+  switch (status) {
+    case 'Done': return 'done';
+    case 'Doing': return 'doing';
+    case 'To Do': return 'todo';
+    case 'Blocked': return 'blocked';
+  }
+}
+
 export const columns: ColumnDef<Ticket>[] = [
   {
     accessorKey: "id",
@@ -21,7 +51,7 @@ export const columns: ColumnDef<Ticket>[] = [
         const ticket = row.original;
         const isOverEstimation = ticket.timeLogged > ticket.estimation && ticket.estimation > 0;
         return (
-            <div className="flex items-center gap-2 w-[100px]">
+            <div className="flex items-center gap-2">
                 {isOverEstimation && (
                     <TooltipProvider>
                         <Tooltip>
@@ -34,9 +64,11 @@ export const columns: ColumnDef<Ticket>[] = [
                         </Tooltip>
                     </TooltipProvider>
                 )}
-                <a href={`https://inwidtd.atlassian.net/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {row.getValue("id")}
-                </a>
+                 <Badge variant="outline" className="font-mono">
+                    <a href={`https://inwidtd.atlassian.net/browse/${row.getValue("id")}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        {row.getValue("id")}
+                    </a>
+                </Badge>
             </div>
         )
     },
@@ -64,55 +96,45 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Status" />
     ),
     cell: ({ row }) => {
-      const status = statuses.find(s => s.value === row.getValue("status"));
+      const status = row.getValue("status") as TicketStatus;
       if (!status) return null;
 
-      const Icon = status.icon;
-
       return (
-        <div className="flex items-center gap-2">
-            {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
-            <span>{status.label}</span>
-        </div>
+        <Badge variant={getStatusBadgeVariant(status)}>
+          {status}
+        </Badge>
       )
     },
   },
   {
-    accessorKey: "scope",
+    accessorKey: "platform",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Platform" />
+    ),
+    cell: ({ row }) => {
+      return (
+         <Badge variant="secondary">
+          {row.getValue("platform")}
+        </Badge>
+      )
+    },
+  },
+   {
+    id: "scope",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Scope" />
     ),
     cell: ({ row }) => {
-      return (
-        <div className="flex items-center">
-          <span>{row.getValue("scope")}</span>
-        </div>
-      )
-    },
-  },
-  {
-    accessorKey: "typeScope",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Type Scope" />
-    ),
-    cell: ({ row }) => {
-       const typeScope = row.getValue("typeScope") as TicketTypeScope;
-       const isOutOfScope = row.original.isOutOfScope;
-
-       const variantMap: Record<TicketTypeScope, "default" | "warning" | "secondary"> = {
-           "Build": "default",
-           "Run": "warning",
-           "Sprint": "secondary",
-       };
-       const variant = isOutOfScope ? "destructive" : variantMap[typeScope];
-       const label = isOutOfScope ? "Out of Scope" : typeScope;
+       const ticket = row.original;
+       const isOutOfScope = ticket.isOutOfScope;
+       
+       const label = isOutOfScope ? "Out of Scope" : getScopeDisplay(ticket);
+       const variant = isOutOfScope ? "destructive" : getScopeBadgeVariant(ticket.typeScope);
 
       return (
-        <div className="flex items-center">
           <Badge variant={variant}>
             {label}
           </Badge>
-        </div>
       )
     },
   },

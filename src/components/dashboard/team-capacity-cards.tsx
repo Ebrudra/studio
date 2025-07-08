@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -119,7 +120,7 @@ export function TeamCapacityCards({ sprint }: TeamCapacityCardsProps) {
     const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
 
     return teamsInSprint.map(team => {
-      const teamTickets = (sprint.tickets || []).filter(t => t.scope === team)
+      const teamTickets = (sprint.tickets || []).filter(t => t.platform === team)
       
       const capacity = sprint.teamCapacity?.[team];
       const plannedBuild = capacity?.plannedBuild ?? 0;

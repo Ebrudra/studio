@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Edit, Trash2, Clock, User, Target, AlertTriangle, Calendar } from "lucide-react"
 import type { Sprint, Ticket } from "@/types"
-import { statuses, scopes } from "./data"
+import { statuses, platforms } from "./data"
 import { EditTaskDialog } from "./edit-task-dialog"
 
 interface TaskCardProps {
@@ -25,7 +25,7 @@ interface TaskCardProps {
 export function TaskCard({ task, sprint, isSprintCompleted, onUpdateTask, onDeleteTask, onLogTime }: TaskCardProps) {
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
     const statusInfo = statuses.find(s => s.value === task.status)
-    const scopeInfo = scopes.find(s => s.value === task.scope)
+    const platformInfo = platforms.find(s => s.value === task.platform)
     const progress = task.estimation > 0 ? (task.timeLogged / task.estimation) * 100 : (task.timeLogged > 0 ? 100 : 0)
     const isOverEstimation = task.timeLogged > task.estimation && task.estimation > 0
 
@@ -125,7 +125,7 @@ export function TaskCard({ task, sprint, isSprintCompleted, onUpdateTask, onDele
                     <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <Target className="w-3.5 h-3.5" />
-                            <span>{scopeInfo?.label || task.scope}</span>
+                            <span>{platformInfo?.label || task.platform}</span>
                         </div>
                          <div className="flex items-center gap-2 text-muted-foreground">
                             {loggedDays && (

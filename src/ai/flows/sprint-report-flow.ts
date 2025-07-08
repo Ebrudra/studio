@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A sprint report generation AI agent.
@@ -40,6 +41,7 @@ const prompt = ai.definePrompt({
   - For each section, first check if you have enough data. If not, explicitly state "Not enough data to generate this section." and briefly mention what data is missing (e.g., "Not enough data. No tickets were found in the sprint.").
   - Do not invent or hallucinate data. Base all analysis strictly on the JSON provided.
   - If historical sprint data is available in 'allSprints' (more than one sprint), use it for trend analysis and comparisons. If not, analyze the current sprint in isolation.
+  - The ticket's 'platform' field refers to the team responsible (e.g., Web, Backend).
 
   **REPORT STRUCTURE:**
   The report should include the following sections. Use Markdown headings (e.g., '## 1. Executive Summary').
@@ -49,7 +51,7 @@ const prompt = ai.definePrompt({
       - Mention overall health (Good, At Risk, etc.) based on completion percentage and challenges.
 
   2.  **Team Performance**:
-      - Analyze the performance of each team that has planned capacity. Discuss their planned vs. delivered work for both 'Build' and 'Run' activities.
+      - Analyze the performance of each platform team that has planned capacity. Discuss their planned vs. delivered work for both 'Build' and 'Run' activities.
       - Compare delivered work against the planned capacity. If capacity data is missing or zero for a team, state it.
 
   3.  **Highlights & Achievements**:

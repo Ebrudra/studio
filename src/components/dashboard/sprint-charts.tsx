@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -32,14 +33,14 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   const [activeTab, setActiveTab] = React.useState("burndown")
   const today = React.useMemo(() => new Date().toISOString().split('T')[0], [])
 
-  const teamsInSprint = React.useMemo(() => ["all-teams", ...Array.from(new Set(sprint.tickets.map(t => t.scope)))], [sprint.tickets])
+  const teamsInSprint = React.useMemo(() => ["all-teams", ...Array.from(new Set(sprint.tickets.map(t => t.platform)))], [sprint.tickets])
 
   const burndownData = React.useMemo(() => {
     if (!sprint.sprintDays || sprint.sprintDays.length === 0) return []
 
     let filteredTickets = sprint.tickets
     if (selectedTeam !== "all-teams") {
-      filteredTickets = filteredTickets.filter(t => t.scope === selectedTeam)
+      filteredTickets = filteredTickets.filter(t => t.platform === selectedTeam)
     }
 
     const sprintStartDate = sprint.sprintDays[0]?.date
@@ -153,7 +154,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     return allTeams
         .filter(team => sprint.teamCapacity?.[team as Team] && sprint.teamCapacity[team as Team].plannedBuild > 0)
         .map(team => {
-            const teamTickets = sprint.tickets.filter(t => t.scope === team)
+            const teamTickets = sprint.tickets.filter(t => t.platform === team)
             const capacity = sprint.teamCapacity[team as Team]
             
             const planned = capacity.plannedBuild + capacity.plannedRun
@@ -191,8 +192,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     sprint.tickets.forEach(ticket => {
         if(ticket.timeLogged > 0) {
             workByType[ticket.typeScope] = (workByType[ticket.typeScope] || 0) + ticket.timeLogged;
-            if (workByTeam.hasOwnProperty(ticket.scope)) {
-                workByTeam[ticket.scope] += ticket.timeLogged;
+            if (workByTeam.hasOwnProperty(ticket.platform)) {
+                workByTeam[ticket.platform] += ticket.timeLogged;
             }
         }
     })

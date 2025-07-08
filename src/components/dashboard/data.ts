@@ -8,7 +8,7 @@ export const statuses: { value: TicketStatus; label: string; icon: React.Element
   { value: "Blocked", label: "Blocked", icon: XCircle },
 ]
 
-export const scopes: { value: Team; label: string }[] = [
+export const platforms: { value: Team; label: string }[] = [
     { value: "Backend", label: "Backend" },
     { value: "iOS", label: "iOS" },
     { value: "Web", label: "Web" },

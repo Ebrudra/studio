@@ -20,7 +20,7 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Team Capacity & Delivery</CardTitle>
+                <CardTitle>Platform Capacity & Delivery</CardTitle>
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">Not enough data to display capacity.</p>
@@ -33,7 +33,7 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-            <CardTitle>Team Capacity & Delivery</CardTitle>
+            <CardTitle>Platform Capacity & Delivery</CardTitle>
             <div className="flex items-center space-x-2">
                 <Button
                     onClick={() => setViewMode('list')}
@@ -65,5 +65,3 @@ export function TeamCapacityTable({ sprint }: TeamCapacityTableProps) {
     </Card>
   )
 }
-
-    

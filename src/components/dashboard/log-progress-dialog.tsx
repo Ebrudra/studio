@@ -18,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { scopes, ticketTypes, typeScopes, statuses } from "./data"
+import { platforms, ticketTypes, typeScopes, statuses } from "./data"
 import type { Sprint, Ticket, TicketStatus, TicketType, TicketTypeScope, Team } from "@/types"
 
 export type LogProgressData = z.infer<typeof formSchema>;
@@ -33,7 +33,7 @@ interface LogProgressDialogProps {
 }
 
 const formSchema = z.object({
-  scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]], { required_error: "Scope is required" }),
+  platform: z.enum(platforms.map(p => p.value) as [Team, ...Team[]], { required_error: "Platform is required" }),
   ticketId: z.string({ required_error: "Ticket is required" }),
   newTicketId: z.string().optional(),
   newTicketTitle: z.string().optional(),
@@ -67,10 +67,10 @@ const defaultLogProgressValues: Partial<LogProgressData> = {
     status: "To Do",
 };
 
-// Helper function to find the canonical team name from the scopes list
+// Helper function to find the canonical team name from the platforms list
 const findCanonicalTeam = (teamName: string | undefined): Team | undefined => {
     if (!teamName) return undefined;
-    const team = scopes.find(s => s.value.toLowerCase() === teamName.toLowerCase());
+    const team = platforms.find(s => s.value.toLowerCase() === teamName.toLowerCase());
     return team ? team.value : undefined;
 };
 
@@ -83,7 +83,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
 
   const { watch, setValue, reset, control, formState: { touchedFields } } = form
 
-  const selectedScope = watch("scope")
+  const selectedPlatform = watch("platform")
   const selectedTicketId = watch("ticketId")
   const selectedType = watch("type")
   const loggedHours = watch("loggedHours")
@@ -103,17 +103,17 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   }, [sprint.sprintDays]);
 
   const filteredTickets = React.useMemo(() => {
-    if (!selectedScope) return []
-    const canonicalScope = findCanonicalTeam(selectedScope);
-    return sprint.tickets.filter(t => findCanonicalTeam(t.scope) === canonicalScope)
-  }, [sprint.tickets, selectedScope])
+    if (!selectedPlatform) return []
+    const canonicalPlatform = findCanonicalTeam(selectedPlatform);
+    return sprint.tickets.filter(t => findCanonicalTeam(t.platform) === canonicalPlatform)
+  }, [sprint.tickets, selectedPlatform])
 
   React.useEffect(() => {
     if (isOpen) {
         if (taskToLog) {
             reset({
                 ...defaultLogProgressValues,
-                scope: findCanonicalTeam(taskToLog.scope),
+                platform: findCanonicalTeam(taskToLog.platform),
                 ticketId: taskToLog.id,
                 type: taskToLog.type,
                 typeScope: taskToLog.typeScope,
@@ -194,16 +194,16 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
             <div className="grid grid-cols-2 gap-4">
                 <FormField
                     control={control}
-                    name="scope"
+                    name="platform"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Scope (Team)</FormLabel>
+                        <FormLabel>Platform (Team)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={!!taskToLog}>
                         <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Select a platform" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            {scopes.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                            {platforms.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                         </SelectContent>
                         </Select>
                         <FormMessage />
@@ -216,7 +216,7 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Ticket</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedScope || !!taskToLog}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedPlatform || !!taskToLog}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a ticket" /></SelectTrigger>
                         </FormControl>

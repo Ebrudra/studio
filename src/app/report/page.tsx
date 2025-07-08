@@ -38,6 +38,8 @@ export default function ReportPage() {
   const [generatedAt, setGeneratedAt] = React.useState<Date | null>(null)
 
   React.useEffect(() => {
+    // This effect runs only on the client, after the initial render.
+    // This avoids hydration mismatch errors.
     setGeneratedAt(new Date());
   }, []);
 
@@ -128,7 +130,7 @@ export default function ReportPage() {
 
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
-                if (allTeams.includes(ticket.scope as Team)) {
+                if (allTeams.includes(ticket.platform as Team)) {
                     const delta = dailyDelta.get(log.date)
                     if (delta) {
                         if(isBuild || isRun) delta.loggedHours += log.loggedHours
@@ -184,7 +186,7 @@ export default function ReportPage() {
     // Team Performance Data
     const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
     const teamPerformanceData = teamsInSprint.map(team => {
-      const teamTickets = (sprint.tickets || []).filter(t => t.scope === team)
+      const teamTickets = (sprint.tickets || []).filter(t => t.platform === team)
       const capacity = sprint.teamCapacity?.[team];
       const plannedBuild = capacity?.plannedBuild ?? 0;
       const plannedRun = capacity?.plannedRun ?? 0;
@@ -222,10 +224,10 @@ export default function ReportPage() {
         sprint.tickets.forEach(ticket => {
             ticket.dailyLogs?.forEach(log => {
                 if (log.date === dayInfo.date) {
-                    if (progress[ticket.scope]) {
-                      if (ticket.typeScope === 'Build') progress[ticket.scope].build += log.loggedHours;
-                      else if (ticket.typeScope === 'Run') progress[ticket.scope].run += log.loggedHours;
-                      else if (ticket.typeScope === 'Sprint') progress[ticket.scope].buffer += log.loggedHours;
+                    if (progress[ticket.platform]) {
+                      if (ticket.typeScope === 'Build') progress[ticket.platform].build += log.loggedHours;
+                      else if (ticket.typeScope === 'Run') progress[ticket.platform].run += log.loggedHours;
+                      else if (ticket.typeScope === 'Sprint') progress[ticket.platform].buffer += log.loggedHours;
                     }
                 }
             })
@@ -242,7 +244,7 @@ export default function ReportPage() {
             }
         });
         return acc;
-    }, { build: 0, run: 0, buffer: 0 });
+    }, { build: 0, run: 0, buffer: 0, total: 0 });
     const total = dailyTotalSummary.build + dailyTotalSummary.run + dailyTotalSummary.buffer
     dailyTotalSummary.total = total;
 
@@ -283,7 +285,7 @@ export default function ReportPage() {
     if (!sprint?.tickets) return
     
     const csvData = sprint.tickets.map(ticket => ({
-      'Scope (Team)': ticket.scope,
+      'Platform (Team)': ticket.platform,
       'Ticket ID': ticket.id,
       'Ticket Link': `https://inwidtd.atlassian.net/browse/${ticket.id}`,
       'Time Logged (Total)': ticket.timeLogged,
@@ -492,5 +494,3 @@ export default function ReportPage() {
     </div>
   )
 }
-
-    

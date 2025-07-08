@@ -13,7 +13,7 @@ export interface Ticket {
   id: string;
   title: string;
   description?: string;
-  scope: Team;
+  platform: Team;
   type: TicketType;
   typeScope: TicketTypeScope;
   estimation: number;

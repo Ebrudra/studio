@@ -18,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { scopes, ticketTypes, typeScopes, statuses } from "./data"
+import { platforms, ticketTypes, typeScopes, statuses } from "./data"
 import { assigneeConfig } from "@/lib/config"
 import type { Ticket, TicketStatus, TicketType, TicketTypeScope, Team } from "@/types"
 
@@ -32,7 +32,7 @@ const formSchema = z.object({
   id: z.string().regex(/^WIN-\d+$/, "Ticket ID must be in WIN-XXXX format"),
   title: z.string().optional(),
   description: z.string().optional(),
-  scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]]),
+  platform: z.enum(platforms.map(p => p.value) as [Team, ...Team[]]),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
@@ -49,7 +49,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
       description: "",
       estimation: 0,
       status: "To Do",
-      scope: undefined,
+      platform: undefined,
       type: undefined,
       typeScope: undefined,
       tags: "",
@@ -70,7 +70,7 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
 
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const assignee = assigneeConfig[values.scope];
+    const assignee = assigneeConfig[values.platform];
     const tags = values.tags ? values.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
     
     const taskData = {
@@ -152,16 +152,16 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="scope"
+                name="platform"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Scope (Team)</FormLabel>
+                    <FormLabel>Platform (Team)</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select a team" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Select a platform" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {scopes.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        {platforms.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />

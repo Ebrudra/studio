@@ -133,13 +133,13 @@ export default function SprintDashboard() {
                     dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: number }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
-                if(dayData[ticket.scope]) {
+                if(dayData[ticket.platform]) {
                     if (ticket.typeScope === 'Build') {
-                        dayData[ticket.scope].build += log.loggedHours;
+                        dayData[ticket.platform].build += log.loggedHours;
                     } else if (ticket.typeScope === 'Run') {
-                        dayData[ticket.scope].run += log.loggedHours;
+                        dayData[ticket.platform].run += log.loggedHours;
                     } else if (ticket.typeScope === 'Sprint') {
-                        dayData[ticket.scope].buffer += log.loggedHours;
+                        dayData[ticket.platform].buffer += log.loggedHours;
                     }
                 }
             }
@@ -199,7 +199,7 @@ export default function SprintDashboard() {
     const capacityData = (Object.keys(processedSprint.teamCapacity || {}) as Team[])
       .filter(t => t !== 'Out of Scope')
       .map(team => {
-        const teamTickets = (processedSprint.tickets || []).filter(t => t.scope === team)
+        const teamTickets = (processedSprint.tickets || []).filter(t => t.platform === team)
         const capacity = processedSprint.teamCapacity?.[team];
         const plannedBuild = capacity?.plannedBuild ?? 0;
         const plannedRun = capacity?.plannedRun ?? 0;
@@ -344,7 +344,7 @@ export default function SprintDashboard() {
           const newTicket: Ticket = {
             id: ticketId,
             title: data.newTicketTitle || data.newTicketId!,
-            scope: data.scope,
+            platform: data.platform,
             type: data.type,
             typeScope: data.typeScope,
             estimation: data.estimation,
@@ -354,7 +354,7 @@ export default function SprintDashboard() {
             creationDate: new Date(logDate).toISOString().split('T')[0],
             description: data.description,
             tags: data.tags,
-            assignee: assigneeConfig[data.scope],
+            assignee: assigneeConfig[data.platform],
           };
           if (newTicket.type === 'Bug' || newTicket.type === 'Buffer') {
             newTicket.estimation = newTicket.timeLogged;
@@ -411,9 +411,9 @@ export default function SprintDashboard() {
         let typeScope: TicketTypeScope = 'Build';
         if (task.type === 'Bug') typeScope = 'Run';
         else if (task.type === 'Buffer') typeScope = 'Sprint';
-        else if (task.scope === 'Out of Scope') typeScope = 'Build';
+        else if (task.platform === 'Out of Scope') typeScope = 'Build';
 
-        const canonicalScope = teams.find(t => t.toLowerCase() === task.scope.toLowerCase()) || 'Out of Scope';
+        const canonicalPlatform = teams.find(t => t.toLowerCase() === task.platform.toLowerCase()) || 'Out of Scope';
         const estimation = Number(task.estimation) || 0;
         const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
 
@@ -421,7 +421,7 @@ export default function SprintDashboard() {
           id: task.id,
           title: task.title || task.id,
           description: task.description,
-          scope: canonicalScope,
+          platform: canonicalPlatform,
           type: task.type,
           estimation: estimation,
           typeScope,
@@ -429,7 +429,7 @@ export default function SprintDashboard() {
           dailyLogs: [],
           status: 'To Do',
           creationDate: new Date().toISOString().split('T')[0],
-          assignee: assigneeConfig[canonicalScope],
+          assignee: assigneeConfig[canonicalPlatform],
           tags: tags,
         };
       });
@@ -472,7 +472,7 @@ export default function SprintDashboard() {
         let ticket = sprintToUpdate.tickets.find((t: Ticket) => t.id === log.ticketId);
 
         if (!ticket) {
-          if (!log.scope || !log.type) continue;
+          if (!log.platform || !log.type) continue;
           
           let typeScope: TicketTypeScope = log.typeScope || 'Build';
           if (log.type === 'Bug') typeScope = 'Run';
@@ -480,23 +480,23 @@ export default function SprintDashboard() {
           else if (log.type === 'User story') typeScope = 'Build';
           
           const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
-          const canonicalScope = teams.find(t => t.toLowerCase() === log.scope!.toLowerCase()) || 'Out of Scope';
+          const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Out of Scope';
           const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
           ticket = {
             id: log.ticketId,
             title: log.title || log.ticketId,
             description: log.description,
-            scope: canonicalScope,
+            platform: canonicalPlatform,
             type: log.type,
             typeScope: typeScope,
             estimation: estimation,
             status: 'To Do',
             timeLogged: 0,
             dailyLogs: [],
-            isOutOfScope: log.scope === 'Out of Scope',
+            isOutOfScope: log.platform === 'Out of Scope',
             creationDate: new Date(logDate).toISOString().split('T')[0],
-            assignee: assigneeConfig[canonicalScope],
+            assignee: assigneeConfig[canonicalPlatform],
             tags: tags,
           };
           sprintToUpdate.tickets.push(ticket);

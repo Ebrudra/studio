@@ -17,7 +17,7 @@ import {
   useReactTable,
   Row,
 } from "@tanstack/react-table"
-import { statuses, scopes } from "./data"
+import { statuses, platforms } from "./data"
 import {
   Table,
   TableBody,
@@ -57,7 +57,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   )
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [viewMode, setViewMode] = React.useState<'list' | 'cards' | 'kanban'>('list');
-  const [groupBy, setGroupBy] = React.useState<'status' | 'scope' | 'day' | null>(null);
+  const [groupBy, setGroupBy] = React.useState<'status' | 'platform' | 'day' | null>(null);
 
   const sprintDayMap = React.useMemo(() => {
     if (!sprint.sprintDays) return new Map<string, number>();
@@ -138,11 +138,11 @@ export function SprintTasksView<TData extends Ticket, TValue>({
         grouped = sortedGrouped;
 
     } else {
-        const groupKeys = (groupBy === 'status' ? statuses.map(s => s.value) : scopes.map(s => s.value));
+        const groupKeys = (groupBy === 'status' ? statuses.map(s => s.value) : platforms.map(p => p.value));
         groupKeys.forEach(key => { grouped[key] = []; });
         
         filteredRows.forEach(row => {
-            const groupKey = row.original[groupBy as 'status' | 'scope'];
+            const groupKey = row.original[groupBy as 'status' | 'platform'];
             if (!grouped[groupKey]) grouped[groupKey] = [];
             grouped[groupKey].push(row);
         });

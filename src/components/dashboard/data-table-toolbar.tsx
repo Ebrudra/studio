@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTableViewOptions } from "./data-table-view-options"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { statuses, scopes, typeScopes } from "./data"
+import { statuses, platforms } from "./data"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>,
   viewMode: 'list' | 'cards' | 'kanban'
   onViewModeChange: (mode: 'list' | 'cards' | 'kanban') => void
-  groupBy: 'status' | 'scope' | 'day' | null
-  onGroupByChange: (value: 'status' | 'scope' | 'day' | null) => void
+  groupBy: 'status' | 'platform' | 'day' | null
+  onGroupByChange: (value: 'status' | 'platform' | 'day' | null) => void
 }
 
 export function DataTableToolbar<TData>({
@@ -31,7 +31,7 @@ export function DataTableToolbar<TData>({
     if (value === 'none') {
         onGroupByChange(null);
     } else {
-        onGroupByChange(value as 'status' | 'scope' | 'day');
+        onGroupByChange(value as 'status' | 'platform' | 'day');
     }
   }
 
@@ -60,15 +60,15 @@ export function DataTableToolbar<TData>({
             </SelectContent>
         </Select>
         <Select
-            value={(table.getColumn("scope")?.getFilterValue() as string) ?? "all"}
-            onValueChange={(value) => table.getColumn("scope")?.setFilterValue(value === "all" ? null : value)}
+            value={(table.getColumn("platform")?.getFilterValue() as string) ?? "all"}
+            onValueChange={(value) => table.getColumn("platform")?.setFilterValue(value === "all" ? null : value)}
         >
             <SelectTrigger className="w-40 h-8">
-                <SelectValue placeholder="Scope" />
+                <SelectValue placeholder="Platform" />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">All Scopes</SelectItem>
-                {scopes.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                <SelectItem value="all">All Platforms</SelectItem>
+                {platforms.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
             </SelectContent>
         </Select>
          <Select
@@ -82,7 +82,7 @@ export function DataTableToolbar<TData>({
             <SelectContent>
                 <SelectItem value="none">No Grouping</SelectItem>
                 <SelectItem value="status">Group by Status</SelectItem>
-                <SelectItem value="scope">Group by Scope</SelectItem>
+                <SelectItem value="platform">Group by Platform</SelectItem>
                 <SelectItem value="day">Group by Day Logged</SelectItem>
             </SelectContent>
         </Select>
