@@ -96,13 +96,14 @@ export const columns: ColumnDef<Ticket>[] = [
       <DataTableColumnHeader column={column} title="Status" />
     ),
     cell: ({ row }) => {
-      const status = row.getValue("status") as TicketStatus;
+      const status = statuses.find(s => s.value === row.getValue("status"));
       if (!status) return null;
 
       return (
-        <Badge variant={getStatusBadgeVariant(status)}>
-          {status}
-        </Badge>
+        <div className="flex items-center">
+          {status.icon && <status.icon className="mr-2 h-4 w-4 text-muted-foreground" />}
+          <span>{status.label}</span>
+        </div>
       )
     },
   },
