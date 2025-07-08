@@ -46,14 +46,14 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
     resolver: zodResolver(formSchema),
     defaultValues: {
       id: task.id,
-      title: task.title,
-      description: task.description,
+      title: task.title || '',
+      description: task.description || '',
       scope: task.scope,
       type: task.type,
       typeScope: task.typeScope,
       estimation: task.estimation,
       status: task.status,
-      tags: task.tags?.join(', '),
+      tags: task.tags?.join(', ') || '',
     },
   })
   
@@ -62,14 +62,14 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
   React.useEffect(() => {
     form.reset({
       id: task.id,
-      title: task.title,
-      description: task.description,
+      title: task.title || '',
+      description: task.description || '',
       scope: task.scope,
       type: task.type,
       typeScope: task.typeScope,
       estimation: task.estimation,
       status: task.status,
-      tags: task.tags?.join(', '),
+      tags: task.tags?.join(', ') || '',
     })
   }, [task, form])
 
