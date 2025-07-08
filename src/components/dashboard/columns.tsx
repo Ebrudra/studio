@@ -67,26 +67,13 @@ export const columns: ColumnDef<Ticket>[] = [
       const status = statuses.find(s => s.value === row.getValue("status"));
       if (!status) return null;
 
-      const statusValue = row.getValue("status") as TicketStatus;
-
-      const variantMap: Record<TicketStatus, "secondary" | "outline"> = {
-          "To Do": "secondary",
-          "Doing": "outline",
-          "Done": "outline",
-          "Blocked": "outline",
-      };
-
-      const classesMap: Partial<Record<TicketStatus, string>> = {
-          "Doing": "bg-primary/10 text-primary border-transparent hover:bg-primary/20",
-          "Done": "bg-success/10 text-success border-transparent hover:bg-success/20",
-          "Blocked": "bg-destructive/10 text-destructive border-transparent hover:bg-destructive/20",
-      };
+      const Icon = status.icon;
 
       return (
-        <Badge variant={variantMap[statusValue]} className={cn("w-[110px] flex justify-start", classesMap[statusValue])}>
-            {status.icon && <status.icon className="mr-2 h-4 w-4" />}
+        <div className="flex items-center gap-2">
+            {Icon && <Icon className="mr-2 h-4 w-4 text-muted-foreground" />}
             <span>{status.label}</span>
-        </Badge>
+        </div>
       )
     },
   },
