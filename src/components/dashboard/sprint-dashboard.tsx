@@ -98,22 +98,35 @@ export default function SprintDashboard() {
     try {
       const sprintsFromDb = await getSprints();
       setSprints(sprintsFromDb);
-      if (!selectedSprintId && sprintsFromDb.length > 0) {
-        setSelectedSprintId(sprintsFromDb[0].id);
-      } else if (sprintsFromDb.length === 0) {
-        setSelectedSprintId(undefined);
-      }
+      return sprintsFromDb;
     } catch (err) {
       console.error("Failed to fetch sprints:", err);
       toast({ variant: "destructive", title: "Error", description: "Could not load sprints from the database." });
+      return [];
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSprintId, toast]);
-
+  }, [toast]);
+  
   useEffect(() => {
-    fetchSprints();
-  }, [fetchSprints]);
+    const initialLoad = async () => {
+        setIsLoading(true);
+        try {
+            const sprintsFromDb = await getSprints();
+            setSprints(sprintsFromDb);
+            if (sprintsFromDb.length > 0) {
+                // On initial load, if no sprint is selected, select the first one.
+                setSelectedSprintId(currentId => currentId ?? sprintsFromDb[0].id);
+            }
+        } catch (err) {
+            console.error("Failed to fetch sprints:", err);
+            toast({ variant: "destructive", title: "Error", description: "Could not load sprints from the database." });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    initialLoad();
+  }, [toast]); // This effect should only run once on mount.
   
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
@@ -257,9 +270,14 @@ export default function SprintDashboard() {
       tickets: [],
       generatedReport: undefined,
     };
-    const newId = await addSprint(newSprint);
-    await fetchSprints();
-    setSelectedSprintId(newId);
+    try {
+        const newId = await addSprint(newSprint);
+        await fetchSprints();
+        setSelectedSprintId(newId);
+    } catch (error) {
+       toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
+       console.error("Error creating sprint:", error);
+    }
   };
   
   const handleUpdateSprint = async (updatedSprintData: Sprint) => {
@@ -545,7 +563,8 @@ export default function SprintDashboard() {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
       await deleteSprintFromDb(selectedSprintId);
-      await fetchSprints();
+      const remainingSprints = await fetchSprints();
+      setSelectedSprintId(remainingSprints.length > 0 ? remainingSprints[0].id : undefined);
       toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
     }
   };
