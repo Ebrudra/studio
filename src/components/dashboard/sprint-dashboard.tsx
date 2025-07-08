@@ -15,7 +15,7 @@ import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -663,14 +663,31 @@ export default function SprintDashboard() {
 
   if (!processedSprint || !selectedSprint) {
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6 flex flex-col items-center justify-center h-screen">
-            <p className="text-muted-foreground mb-4">No sprint selected or available.</p>
-            <Button onClick={() => setIsNewSprintOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Start a New Sprint
-            </Button>
-            <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
+      <div className="p-4 sm:p-6 lg:p-8">
+        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+            <Card className="max-w-2xl p-8 shadow-lg">
+                <CardHeader>
+                    <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
+                        <Rocket className="w-10 h-10 text-primary" />
+                    </div>
+                    <CardTitle className="text-3xl font-bold mt-4">Welcome to SprintPilot</CardTitle>
+                    <CardDescription className="text-lg text-muted-foreground mt-2">
+                        Your new command center for tracking sprints and managing projects with AI-powered insights.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="mb-6">
+                        Get started by creating your first sprint. You'll be able to add tasks, log progress, and generate detailed reports in minutes.
+                    </p>
+                    <Button onClick={() => setIsNewSprintOpen(true)} size="lg">
+                        <Plus className="mr-2 h-5 w-5" />
+                        Start a New Sprint
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
+      </div>
     );
   }
   
