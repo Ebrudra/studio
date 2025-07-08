@@ -410,7 +410,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                       <YAxis fontSize={12} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       {allTeams.map(team => (
-                          <Area key={team} type="monotone" dataKey={team.toLowerCase()} stackId="1" stroke={`var(--color-${team.toLowerCase()})`} fill={`var(--color-${team.toLowerCase()})`} />
+                          <Area key={`area-${team}`} type="monotone" dataKey={team.toLowerCase()} stackId="1" stroke={`var(--color-${team.toLowerCase()})`} fill={`var(--color-${team.toLowerCase()})`} />
                       ))}
                     </AreaChart>
                   </ResponsiveContainer>
@@ -449,13 +449,13 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 </ResponsiveContainer>
               </ChartContainer>
                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-                {teamPerformanceData.map((team) => (
-                  <div key={team.team} className="p-4 bg-muted/50 rounded-lg">
-                    <div className="font-medium text-sm">{team.team}</div>
-                    <div className="text-2xl font-bold mt-1">{team.efficiency.toFixed(0)}%</div>
+                {teamPerformanceData.map((teamData) => (
+                  <div key={`perf-${teamData.team}`} className="p-4 bg-muted/50 rounded-lg">
+                    <div className="font-medium text-sm">{teamData.team}</div>
+                    <div className="text-2xl font-bold mt-1">{teamData.efficiency.toFixed(0)}%</div>
                     <div className="text-xs text-muted-foreground">Efficiency</div>
                     <Badge variant="outline" className="mt-2 font-normal">
-                      {team.velocity}h/day
+                      {teamData.velocity}h/day
                     </Badge>
                   </div>
                 ))}
@@ -478,7 +478,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         <Pie data={distributionData.workByTeam} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
                           label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
                         >
-                          {distributionData.workByTeam.map((entry) => ( <Cell key={entry.name} fill={TEAM_COLORS[entry.name]} /> ))}
+                          {distributionData.workByTeam.map((entry) => ( <Cell key={`cell-team-${entry.name}`} fill={TEAM_COLORS[entry.name]} /> ))}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                       </PieChart>
@@ -486,7 +486,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                   </ChartContainer>
                 <div className="space-y-3 mt-6">
                   {distributionData.workByTeam.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div key={`item-team-${item.name}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-4 h-4 rounded-full" style={{ backgroundColor: TEAM_COLORS[item.name] }} />
                         <span className="font-medium">{item.name}</span>
@@ -513,7 +513,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         <Pie data={distributionData.workByType} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value"
                             label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
                         >
-                          {distributionData.workByType.map((entry) => ( <Cell key={entry.name} fill={TYPE_COLORS[entry.name]} /> ))}
+                          {distributionData.workByType.map((entry) => ( <Cell key={`cell-type-${entry.name}`} fill={TYPE_COLORS[entry.name]} /> ))}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
                       </PieChart>
@@ -521,7 +521,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                   </ChartContainer>
                 <div className="space-y-3 mt-6">
                   {distributionData.workByType.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div key={`item-type-${item.name}`} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-4 h-4 rounded-full" style={{ backgroundColor: TYPE_COLORS[item.name] }} />
                         <span className="font-medium">{item.name}</span>
