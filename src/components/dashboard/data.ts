@@ -13,8 +13,6 @@ export const platforms: { value: Team; label: string }[] = [
     { value: "iOS", label: "iOS" },
     { value: "Web", label: "Web" },
     { value: "Android", label: "Android" },
-    { value: "Mobile", label: "Mobile" },
-    { value: "Out of Scope", label: "Out of Scope" },
 ]
 
 export const ticketTypes: { value: TicketType; label: string }[] = [

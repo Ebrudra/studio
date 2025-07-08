@@ -3,7 +3,7 @@ import type { Sprint, Team } from '@/types';
 import { eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
 import { assigneeConfig } from './config';
 
-export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android', 'Mobile'];
+export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android'];
 
 const generateSprintDays = (startDateStr: string, endDateStr: string) => {
     const days = [];
@@ -39,8 +39,6 @@ export const sprints: Sprint[] = [
       'iOS': { plannedBuild: 54, plannedRun: 10 },
       'Web': { plannedBuild: 60, plannedRun: 12 },
       'Android': { plannedBuild: 48, plannedRun: 8 },
-      'Mobile': { plannedBuild: 30, plannedRun: 2 },
-      'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
     },
     tickets: [
       { id: 'WIN-5929', title: 'Implement new login flow', description: 'Create secure login/logout functionality with JWT tokens and password reset.', platform: 'Web', assignee: assigneeConfig.Web, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['auth', 'frontend'], completionDate: '2024-07-09T10:00:00.000Z', dailyLogs: [{ date: '2024-07-09', loggedHours: 8 }] },
@@ -49,7 +47,7 @@ export const sprints: Sprint[] = [
       { id: 'WIN-5932', title: 'Add push notification support', description: 'Integrate with Firebase Cloud Messaging to enable push notifications.', platform: 'Android', assignee: assigneeConfig.Android, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['notifications', 'firebase'], completionDate: '2024-07-12T10:00:00.000Z', dailyLogs: [{ date: '2024-07-12', loggedHours: 8 }] },
       { id: 'WIN-5933', title: 'Refactor user service', description: 'Improve the performance and maintainability of the user management service.', platform: 'Backend', assignee: assigneeConfig.Backend, type: 'Task', typeScope: 'Build', estimation: 13, timeLogged: 10, status: 'Doing', tags: ['refactor', 'backend'], dailyLogs: [{ date: '2024-07-13', loggedHours: 5 }, { date: '2024-07-14', loggedHours: 5 }] },
       { id: 'WIN-5934', title: 'Investigate payment gateway errors', description: 'Users are reporting intermittent failures during the checkout process.', platform: 'Web', assignee: assigneeConfig.Web, type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 4, status: 'Doing', tags: ['payments', 'investigation'], dailyLogs: [{ date: '2024-07-14', loggedHours: 4 }] },
-      { id: 'WIN-5935', title: 'Design new profile page', description: 'Create mockups and prototypes for the new user profile page.', platform: 'Mobile', assignee: assigneeConfig.Mobile, type: 'User story', typeScope: 'Build', estimation: 5, timeLogged: 0, status: 'To Do', tags: ['design', 'mobile'], dailyLogs: [] },
+      { id: 'WIN-5935', title: 'Design new profile page', description: 'Create mockups and prototypes for the new user profile page.', platform: 'Web', assignee: assigneeConfig.Web, type: 'User story', typeScope: 'Build', estimation: 5, timeLogged: 0, status: 'To Do', tags: ['design', 'mobile'], dailyLogs: [] },
       { id: 'WIN-5936', title: 'Onboarding tutorial implementation', description: 'Build the multi-step tutorial for new users on iOS.', platform: 'iOS', assignee: assigneeConfig.iOS, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 0, status: 'To Do', tags: ['onboarding', 'ux'], dailyLogs: [] },
       { id: 'WIN-5937', title: 'Sprint planning & admin', description: 'Buffer time for sprint ceremonies and administrative tasks.', platform: 'Backend', assignee: assigneeConfig.Backend, type: 'Buffer', typeScope: 'Sprint', estimation: 10, timeLogged: 5, status: 'Doing', tags: ['admin', 'planning'], dailyLogs: [{ date: '2024-07-08', loggedHours: 5 }] },
       { id: 'WIN-5938', title: 'Add new endpoint for user data', description: 'Create a new GET endpoint to fetch user profile information.', platform: 'Backend', assignee: assigneeConfig.Backend, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['api'], completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 8 }] },
@@ -63,15 +61,13 @@ export const sprints: Sprint[] = [
     startDate: '2024-07-22',
     endDate: '2024-08-04',
     sprintDays: generateSprintDays('2024-07-22', '2024-08-04'),
-    status: 'Active',
+    status: 'Scoping',
     lastUpdatedAt: new Date().toISOString(),
      teamCapacity: {
       'Backend': { plannedBuild: 60, plannedRun: 12 },
       'iOS': { plannedBuild: 60, plannedRun: 12 },
       'Web': { plannedBuild: 60, plannedRun: 12 },
       'Android': { plannedBuild: 60, plannedRun: 12 },
-      'Mobile': { plannedBuild: 60, plannedRun: 12 },
-      'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
     },
     tickets: [
       { id: 'WIN-6001', title: 'User profile page redesign', description: 'Implement the approved designs for the new user profile page.', platform: 'Web', assignee: assigneeConfig.Web, type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 0, status: 'To Do', tags: ['ui', 'frontend'], dailyLogs: [] },

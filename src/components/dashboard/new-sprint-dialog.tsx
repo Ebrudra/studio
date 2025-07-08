@@ -128,7 +128,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       startDate: values.startDate.toISOString(),
       endDate: values.endDate.toISOString(),
       sprintDays,
-      status: 'Active',
+      status: 'Scoping',
       teamCapacity: teamCapacity,
       totalCapacity: totalBuild + totalRun,
       buildCapacity: totalBuild,

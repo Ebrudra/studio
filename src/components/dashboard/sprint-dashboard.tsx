@@ -8,7 +8,7 @@ import { assigneeConfig } from '@/lib/config';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SprintTasksView } from './sprint-tasks-view';
 import { SprintCharts } from './sprint-charts';
@@ -34,6 +34,49 @@ import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { InsightBulb } from './insight-bulb';
+
+const SprintScopingView = ({
+  sprint,
+  onFinalizeScope,
+  onOpenAddTask,
+  onOpenBulkUpload,
+  ...taskViewProps
+}: {
+  sprint: Sprint;
+  onFinalizeScope: () => void;
+  onOpenAddTask: () => void;
+  onOpenBulkUpload: () => void;
+  onUpdateTask: (task: Ticket) => void;
+  onDeleteTask: (taskId: string) => void;
+  onLogTime: (task: Ticket) => void;
+}) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Define Initial Scope for "{sprint.name}"</CardTitle>
+        <CardDescription>
+          Add all the initial 'Build' tickets for this sprint. You can add them manually or upload a CSV file.
+          Any 'Build' tickets added after finalizing the scope will be marked as 'Out of Scope'.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex justify-end gap-2 mb-4">
+          <Button onClick={onOpenBulkUpload} variant="outline"><Upload className="mr-2 h-4 w-4" /> Bulk Upload Tasks</Button>
+          <Button onClick={onOpenAddTask} variant="outline"><Plus className="mr-2 h-4 w-4" /> Add Task Manually</Button>
+        </div>
+        <SprintTasksView
+          columns={columns}
+          data={sprint.tickets}
+          sprint={sprint}
+          {...taskViewProps}
+        />
+        <div className="mt-6 flex justify-end">
+          <Button onClick={onFinalizeScope} size="lg">
+            <CheckCircle className="mr-2 h-5 w-5" /> Finalize Scope & Start Sprint
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+);
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -197,7 +240,6 @@ export default function SprintDashboard() {
     const velocityChange = previousVelocity > 0 ? Math.abs(((currentVelocity - previousVelocity) / previousVelocity) * 100) : 0;
 
     const capacityData = (Object.keys(processedSprint.teamCapacity || {}) as Team[])
-      .filter(t => t !== 'Out of Scope')
       .map(team => {
         const teamTickets = (processedSprint.tickets || []).filter(t => t.platform === team)
         const capacity = processedSprint.teamCapacity?.[team];
@@ -271,7 +313,15 @@ export default function SprintDashboard() {
   };
 
   const handleAddTask = (newTaskData: Omit<Ticket, "timeLogged">) => {
-    const newTask: Ticket = { ...newTaskData, title: newTaskData.title || newTaskData.id, timeLogged: 0, dailyLogs: [], creationDate: new Date().toISOString().split('T')[0] };
+    const isOutOfScope = selectedSprint?.status === 'Active' && newTaskData.typeScope === 'Build';
+    const newTask: Ticket = {
+      ...newTaskData,
+      title: newTaskData.title || newTaskData.id,
+      timeLogged: 0,
+      dailyLogs: [],
+      creationDate: new Date().toISOString().split('T')[0],
+      isOutOfScope,
+    };
 
     updateSprints(prevSprints =>
       prevSprints.map(sprint =>
@@ -341,6 +391,7 @@ export default function SprintDashboard() {
         };
 
         if (isNewTicket) {
+          const isOutOfScope = sprint.status === 'Active' && data.typeScope === 'Build';
           const newTicket: Ticket = {
             id: ticketId,
             title: data.newTicketTitle || data.newTicketId!,
@@ -355,6 +406,7 @@ export default function SprintDashboard() {
             description: data.description,
             tags: data.tags,
             assignee: assigneeConfig[data.platform],
+            isOutOfScope,
           };
           if (newTicket.type === 'Bug' || newTicket.type === 'Buffer') {
             newTicket.estimation = newTicket.timeLogged;
@@ -411,9 +463,9 @@ export default function SprintDashboard() {
         let typeScope: TicketTypeScope = 'Build';
         if (task.type === 'Bug') typeScope = 'Run';
         else if (task.type === 'Buffer') typeScope = 'Sprint';
-        else if (task.platform === 'Out of Scope') typeScope = 'Build';
 
-        const canonicalPlatform = teams.find(t => t.toLowerCase() === task.platform.toLowerCase()) || 'Out of Scope';
+        const isOutOfScope = sprintToUpdate.status === 'Active' && typeScope === 'Build';
+        const canonicalPlatform = teams.find(t => t.toLowerCase() === task.platform.toLowerCase()) || 'Web';
         const estimation = Number(task.estimation) || 0;
         const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
 
@@ -431,6 +483,7 @@ export default function SprintDashboard() {
           creationDate: new Date().toISOString().split('T')[0],
           assignee: assigneeConfig[canonicalPlatform],
           tags: tags,
+          isOutOfScope,
         };
       });
 
@@ -479,8 +532,9 @@ export default function SprintDashboard() {
           else if (log.type === 'Buffer') typeScope = 'Sprint';
           else if (log.type === 'User story') typeScope = 'Build';
           
+          const isOutOfScope = sprintToUpdate.status === 'Active' && typeScope === 'Build';
           const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
-          const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Out of Scope';
+          const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Web';
           const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
           ticket = {
@@ -494,7 +548,7 @@ export default function SprintDashboard() {
             status: 'To Do',
             timeLogged: 0,
             dailyLogs: [],
-            isOutOfScope: log.platform === 'Out of Scope',
+            isOutOfScope,
             creationDate: new Date(logDate).toISOString().split('T')[0],
             assignee: assigneeConfig[canonicalPlatform],
             tags: tags,
@@ -583,6 +637,15 @@ export default function SprintDashboard() {
     }
   };
 
+  const handleFinalizeScope = () => {
+    if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
+      updateSprints(
+        prev => prev.map(s => s.id === selectedSprintId ? { ...s, status: 'Active', lastUpdatedAt: new Date().toISOString() } : s)
+      );
+      toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
+    }
+  };
+
   if (!isLoaded) {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -625,7 +688,9 @@ export default function SprintDashboard() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-gray-800">Sprint Command Center</h1>
-            {isSprintCompleted && <Badge variant="success" className="text-base"><FileArchive className="mr-2 h-4 w-4" />Completed</Badge>}
+            {processedSprint.status === 'Completed' && <Badge variant="success" className="text-base"><FileArchive className="mr-2 h-4 w-4" />Completed</Badge>}
+            {processedSprint.status === 'Active' && <Badge variant="default" className="text-base"><Zap className="mr-2 h-4 w-4" />Active</Badge>}
+            {processedSprint.status === 'Scoping' && <Badge variant="secondary" className="text-base"><ListTodo className="mr-2 h-4 w-4" />Scoping</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">
             Data last updated at: {lastUpdated ? lastUpdated.toLocaleString() : 'N/A'}
@@ -667,138 +732,152 @@ export default function SprintDashboard() {
              </DropdownMenu>
         </div>
       </header>
-      
-      {sprintWarnings.length > 0 && (
-        <div className="space-y-2">
-            {sprintWarnings.map((warning, index) => (
-                 <Alert key={index} variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>{warning.title}</AlertTitle>
-                    <AlertDescription>{warning.description}</AlertDescription>
-                </Alert>
-            ))}
-        </div>
+
+      {processedSprint.status === 'Scoping' ? (
+        <SprintScopingView
+            sprint={processedSprint}
+            onFinalizeScope={handleFinalizeScope}
+            onOpenAddTask={() => setIsAddTaskOpen(true)}
+            onOpenBulkUpload={() => setIsBulkUploadOpen(true)}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onLogTime={handleLogRowAction}
+        />
+      ) : (
+      <>
+        {sprintWarnings.length > 0 && (
+          <div className="space-y-2">
+              {sprintWarnings.map((warning, index) => (
+                   <Alert key={index} variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>{warning.title}</AlertTitle>
+                      <AlertDescription>{warning.description}</AlertDescription>
+                  </Alert>
+              ))}
+          </div>
+        )}
+
+        {metricsData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                  <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                      <div>
+                          <div className="text-2xl font-bold">{metricsData.currentVelocity.toFixed(1)}</div>
+                          <div className="text-xs text-muted-foreground">Current Velocity</div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                          {metricsData.velocityTrend === "up" ? (
+                          <TrendingUp className="w-4 h-4 text-success" />
+                          ) : (
+                          <TrendingDown className="w-4 h-4 text-destructive" />
+                          )}
+                          <span className={`text-xs ${metricsData.velocityTrend === "up" ? "text-success" : "text-destructive"}`}>
+                          {metricsData.velocityChange.toFixed(1)}%
+                          </span>
+                      </div>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              <Card>
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <Target className="w-5 h-5 text-primary" />
+                      <div>
+                      <div className="text-2xl font-bold">{metricsData.sprintProgress.toFixed(1)}%</div>
+                      <div className="text-xs text-muted-foreground">Sprint Progress</div>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              <Card>
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <Clock className="w-5 h-5 text-warning" />
+                      <div>
+                      <div className="text-2xl font-bold">{metricsData.remainingWork.toFixed(1)}h</div>
+                      <div className="text-xs text-muted-foreground">Remaining Work</div>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              <Card>
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <Users className="w-5 h-5 text-purple-500" />
+                      <div>
+                      <div className="text-2xl font-bold">{metricsData.teamEfficiency.toFixed(1)}%</div>
+                      <div className="text-xs text-muted-foreground">Team Efficiency</div>
+                      </div>
+                  </CardContent>
+              </Card>
+          </div>
+         )}
+
+          <Tabs defaultValue="tasks" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="tasks">
+                      <ListTodo className="mr-2 h-4 w-4" />
+                      Tasks
+                  </TabsTrigger>
+                  <TabsTrigger value="analytics">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analytics
+                  </TabsTrigger>
+                  <TabsTrigger value="capacity">
+                      <Users className="mr-2 h-4 w-4" />
+                      Team Capacity
+                  </TabsTrigger>
+                  <TabsTrigger value="progress">
+                      <GitCommitHorizontal className="mr-2 h-4 w-4" />
+                      Daily Progress
+                  </TabsTrigger>
+              </TabsList>
+          
+              <TabsContent value="tasks" className="mt-4">
+                  <Card>
+                      <CardHeader>
+                          <div className="flex items-center justify-between">
+                              <CardTitle className="flex items-center gap-2">
+                                  Sprint Tasks
+                                  <Badge variant="outline">{processedSprint.tickets.length}</Badge>
+                              </CardTitle>
+
+                              <div className="flex items-center gap-2">
+                                  {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
+                                  <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                                      <Upload className="w-4 h-4 mr-2" />
+                                      Bulk Upload
+                                  </Button>
+                                  <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
+                                      <FileText className="w-4 h-4 mr-2" />
+                                      Log Progress
+                                  </Button>
+                                  <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add Task
+                                  </Button>
+                              </div>
+                          </div>
+                      </CardHeader>
+                      <CardContent>
+                          <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+                      </CardContent>
+                  </Card>
+              </TabsContent>
+
+              <TabsContent value="analytics" className="mt-4">
+                  <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
+              </TabsContent>
+
+              <TabsContent value="capacity" className="mt-4">
+                  <TeamCapacityTable sprint={processedSprint} />
+              </TabsContent>
+              
+              <TabsContent value="progress" className="mt-4">
+                  <TeamDailyProgress dailyProgress={dailyProgressData} />
+              </TabsContent>
+          </Tabs>
+      </>
       )}
-
-      {metricsData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-2xl font-bold">{metricsData.currentVelocity.toFixed(1)}</div>
-                        <div className="text-xs text-muted-foreground">Current Velocity</div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        {metricsData.velocityTrend === "up" ? (
-                        <TrendingUp className="w-4 h-4 text-success" />
-                        ) : (
-                        <TrendingDown className="w-4 h-4 text-destructive" />
-                        )}
-                        <span className={`text-xs ${metricsData.velocityTrend === "up" ? "text-success" : "text-destructive"}`}>
-                        {metricsData.velocityChange.toFixed(1)}%
-                        </span>
-                    </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                    <Target className="w-5 h-5 text-primary" />
-                    <div>
-                    <div className="text-2xl font-bold">{metricsData.sprintProgress.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">Sprint Progress</div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                    <Clock className="w-5 h-5 text-warning" />
-                    <div>
-                    <div className="text-2xl font-bold">{metricsData.remainingWork.toFixed(1)}h</div>
-                    <div className="text-xs text-muted-foreground">Remaining Work</div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                    <Users className="w-5 h-5 text-purple-500" />
-                    <div>
-                    <div className="text-2xl font-bold">{metricsData.teamEfficiency.toFixed(1)}%</div>
-                    <div className="text-xs text-muted-foreground">Team Efficiency</div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-       )}
-
-        <Tabs defaultValue="tasks" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="tasks">
-                    <ListTodo className="mr-2 h-4 w-4" />
-                    Tasks
-                </TabsTrigger>
-                <TabsTrigger value="analytics">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Analytics
-                </TabsTrigger>
-                <TabsTrigger value="capacity">
-                    <Users className="mr-2 h-4 w-4" />
-                    Team Capacity
-                </TabsTrigger>
-                <TabsTrigger value="progress">
-                    <GitCommitHorizontal className="mr-2 h-4 w-4" />
-                    Daily Progress
-                </TabsTrigger>
-            </TabsList>
-        
-            <TabsContent value="tasks" className="mt-4">
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                Sprint Tasks
-                                <Badge variant="outline">{processedSprint.tickets.length}</Badge>
-                            </CardTitle>
-
-                            <div className="flex items-center gap-2">
-                                {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
-                                <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    Bulk Upload
-                                </Button>
-                                <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                    <FileText className="w-4 h-4 mr-2" />
-                                    Log Progress
-                                </Button>
-                                <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Task
-                                </Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="analytics" className="mt-4">
-                <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
-            </TabsContent>
-
-            <TabsContent value="capacity" className="mt-4">
-                <TeamCapacityTable sprint={processedSprint} />
-            </TabsContent>
-            
-            <TabsContent value="progress" className="mt-4">
-                <TeamDailyProgress dailyProgress={dailyProgressData} />
-            </TabsContent>
-        </Tabs>
     </div>
   );
 }

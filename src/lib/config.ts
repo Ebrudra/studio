@@ -5,6 +5,4 @@ export const assigneeConfig: Record<Team, string | undefined> = {
     'Web': 'Youssef.S',
     'Android': 'Ahmed.E',
     'iOS': 'Nour.E',
-    'Mobile': undefined,
-    'Out of Scope': undefined,
 };

@@ -1,5 +1,5 @@
 
-export type Team = 'Backend' | 'iOS' | 'Web' | 'Android' | 'Mobile' | 'Out of Scope';
+export type Team = 'Backend' | 'iOS' | 'Web' | 'Android';
 export type TicketType = 'User story' | 'Bug' | 'Task' | 'Buffer';
 export type TicketTypeScope = 'Build' | 'Run' | 'Sprint';
 export type TicketStatus = 'To Do' | 'Doing' | 'Done' | 'Blocked';
@@ -42,7 +42,7 @@ export interface Sprint {
   name: string;
   startDate: string;
   endDate: string;
-  status: 'Active' | 'Completed';
+  status: 'Scoping' | 'Active' | 'Completed';
   tickets: Ticket[];
   sprintDays: SprintDay[];
   lastUpdatedAt: string;
