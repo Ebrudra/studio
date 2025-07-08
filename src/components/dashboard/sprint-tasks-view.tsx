@@ -59,6 +59,11 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   const [viewMode, setViewMode] = React.useState<'list' | 'cards' | 'kanban'>('list');
   const [groupBy, setGroupBy] = React.useState<'status' | 'scope' | 'day' | null>(null);
 
+  const sprintDayMap = React.useMemo(() => {
+    if (!sprint.sprintDays) return new Map<string, number>();
+    return new Map(sprint.sprintDays.map((d) => [d.date, d.day]));
+  }, [sprint.sprintDays]);
+
   const table = useReactTable({
     data,
     columns,
@@ -73,6 +78,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
       onDeleteTask,
       onLogTime,
       sprint,
+      sprintDayMap,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
@@ -88,6 +94,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   })
   
   const filteredRows = table.getRowModel().rows;
+  const filteredTasks = filteredRows.map(row => row.original as Ticket);
   
   const groupedData = React.useMemo(() => {
     if (!groupBy) return null;
@@ -307,6 +314,32 @@ export function SprintTasksView<TData extends Ticket, TValue>({
         onGroupByChange={setGroupBy}
       />
       {renderContent()}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+          <div className="text-center p-3 bg-success/10 rounded-lg border">
+            <div className="text-2xl font-bold text-success">
+              {filteredTasks.filter((t) => t.status === "Done").length}
+            </div>
+            <div className="text-xs text-muted-foreground">Completed</div>
+          </div>
+          <div className="text-center p-3 bg-primary/10 rounded-lg border">
+            <div className="text-2xl font-bold text-primary">
+              {filteredTasks.filter((t) => t.status === "Doing").length}
+            </div>
+            <div className="text-xs text-muted-foreground">In Progress</div>
+          </div>
+          <div className="text-center p-3 bg-warning/10 rounded-lg border">
+            <div className="text-2xl font-bold text-warning-foreground">
+              {filteredTasks.reduce((sum, task) => sum + task.estimation, 0).toFixed(1)}h
+            </div>
+            <div className="text-xs text-muted-foreground">Total Estimated</div>
+          </div>
+          <div className="text-center p-3 bg-muted/50 rounded-lg border">
+            <div className="text-2xl font-bold text-foreground">
+              {filteredTasks.reduce((sum, task) => sum + task.timeLogged, 0).toFixed(1)}h
+            </div>
+            <div className="text-xs text-muted-foreground">Total Logged</div>
+          </div>
+      </div>
     </div>
   )
 }

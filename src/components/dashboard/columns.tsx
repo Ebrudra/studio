@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "./data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
-import { Ticket, TicketStatus, TicketTypeScope } from "@/types"
+import { Ticket, TicketStatus, TicketTypeScope, Sprint } from "@/types"
 import { statuses } from "./data"
 import { cn } from "@/lib/utils"
 
@@ -140,6 +140,29 @@ export const columns: ColumnDef<Ticket>[] = [
           <span>{row.getValue("timeLogged")}</span>
         </div>
       )
+    },
+  },
+  {
+    id: "loggedDays",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Logged Days" />
+    ),
+    cell: ({ row, table }) => {
+      const task = row.original as Ticket;
+      const { sprintDayMap } = table.options.meta as { sprintDayMap: Map<string, number> };
+
+      if (!task.dailyLogs?.length || !sprintDayMap) {
+        return null;
+      }
+
+      const loggedDays = task.dailyLogs
+        .map((log) => sprintDayMap.get(log.date))
+        .filter((day): day is number => !!day)
+        .sort((a, b) => a - b)
+        .map((day) => `D${day}`)
+        .join(", ");
+
+      return <span>{loggedDays}</span>;
     },
   },
   {
