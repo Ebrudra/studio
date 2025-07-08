@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -16,6 +17,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { scopes, ticketTypes, typeScopes, statuses } from "./data"
 import type { Sprint, Ticket, TicketStatus, TicketType, TicketTypeScope, Team } from "@/types"
 
@@ -35,6 +37,8 @@ const formSchema = z.object({
   ticketId: z.string({ required_error: "Ticket is required" }),
   newTicketId: z.string().optional(),
   newTicketTitle: z.string().optional(),
+  newTicketDescription: z.string().optional(),
+  newTicketTags: z.string().optional(),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   day: z.string({ required_error: "Day is required" }),
@@ -54,6 +58,8 @@ const formSchema = z.object({
 const defaultLogProgressValues: Partial<LogProgressData> = {
     newTicketId: "",
     newTicketTitle: "",
+    newTicketDescription: "",
+    newTicketTags: "",
     estimation: 0,
     loggedHours: 0,
     type: "Task",
@@ -164,8 +170,13 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
   }
 
   const onSubmit = (values: LogProgressData) => {
-    const dataToLog = {...values, title: values.newTicketTitle || values.newTicketId};
-    onLogProgress(dataToLog)
+    const dataToLog = {
+        ...values,
+        title: values.newTicketTitle || values.newTicketId,
+        description: values.newTicketDescription,
+        tags: values.newTicketTags ? values.newTicketTags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+    };
+    onLogProgress(dataToLog as any) // Type assertion to match LogProgressData including parsed tags
     handleClose()
   }
 
@@ -221,30 +232,54 @@ export function LogProgressDialog({ isOpen, setIsOpen, sprint, onLogProgress, ta
             </div>
             
             {isNewTicket && (
-                 <div className="grid grid-cols-2 gap-4">
+                 <>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={control}
+                            name="newTicketId"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>New Ticket ID</FormLabel>
+                                    <FormControl><Input placeholder="WIN-5555" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={control}
+                            name="newTicketTitle"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>New Ticket Title</FormLabel>
+                                    <FormControl><Input placeholder="Fix critical issue" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                     <FormField
                         control={control}
-                        name="newTicketId"
+                        name="newTicketDescription"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>New Ticket ID</FormLabel>
-                                <FormControl><Input placeholder="WIN-5555" {...field} /></FormControl>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl><Textarea placeholder="Detailed description of the new ticket..." {...field} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                    <FormField
+                     <FormField
                         control={control}
-                        name="newTicketTitle"
+                        name="newTicketTags"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>New Ticket Title</FormLabel>
-                                <FormControl><Input placeholder="Fix critical issue" {...field} /></FormControl>
+                                <FormLabel>Tags</FormLabel>
+                                <FormControl><Input placeholder="bug, critical, frontend" {...field} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                 </div>
+                 </>
             )}
 
             <div className="grid grid-cols-2 gap-4">

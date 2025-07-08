@@ -12,6 +12,7 @@ export interface DailyLog {
 export interface Ticket {
   id: string;
   title: string;
+  description?: string;
   scope: Team;
   type: TicketType;
   typeScope: TicketTypeScope;
@@ -22,6 +23,8 @@ export interface Ticket {
   completionDate?: string; // YYYY-MM-DD
   dailyLogs?: DailyLog[];
   isOutOfScope?: boolean;
+  assignee?: string;
+  tags?: string[];
 }
 
 export interface SprintDay {

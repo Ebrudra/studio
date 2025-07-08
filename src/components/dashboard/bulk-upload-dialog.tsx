@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -20,9 +21,11 @@ import type { Team, TicketType, TicketStatus, TicketTypeScope } from "@/types"
 export type BulkTask = {
   id: string
   title: string
+  description?: string
   scope: Team
   type: TicketType
   estimation: number
+  tags?: string
 }
 
 // Progress logs can also create new tickets, so we include optional fields
@@ -32,10 +35,12 @@ export type BulkProgressLog = {
   loggedHours: number
   status: TicketStatus
   title?: string
+  description?: string
   scope?: Team
   type?: TicketType
   typeScope?: TicketTypeScope
   estimation?: number
+  tags?: string
 }
 
 interface BulkUploadDialogProps {
@@ -68,10 +73,10 @@ export function BulkUploadDialog({
     let fileName: string
 
     if (type === "tasks") {
-      csvContent = "id,title,scope,type,estimation\nWIN-9001,New Feature X,Web,User story,13\nWIN-9002,Fix Critical Bug Y,Backend,Bug,8"
+      csvContent = "id,title,description,scope,type,estimation,tags\nWIN-9001,New Feature X,A detailed description,Web,User story,13,frontend,auth\nWIN-9002,Fix Critical Bug Y,Another description,Backend,Bug,8,backend,bugfix"
       fileName = "tasks_sample.csv"
     } else {
-      csvContent = "day,ticketId,loggedHours,status,title,scope,type,estimation\nD1,WIN-9001,4,In Progress,,,\nD2,WIN-9999,5,To Do,New urgent bug fix,Backend,Bug,5"
+      csvContent = "day,ticketId,loggedHours,status,title,description,scope,type,estimation,tags\nD1,WIN-9001,4,In Progress,,,,,\nD2,WIN-9999,5,To Do,New urgent bug fix,A new description,Backend,Bug,5,backend,urgent"
       fileName = "progress_log_sample.csv"
     }
 
@@ -136,7 +141,7 @@ export function BulkUploadDialog({
               <Input id="tasks-file" type="file" accept=".csv" onChange={(e) => handleFileChange(e, "tasks")} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Required columns: `id`, `title`, `scope`, `type`, `estimation`.
+              Required: `id`, `scope`, `type`, `estimation`. Optional: `title`, `description`, `tags`.
             </p>
              <div className="flex justify-between items-center">
                  <Button variant="link" size="sm" className="p-0" onClick={() => downloadSampleCSV("tasks")}>
@@ -153,7 +158,7 @@ export function BulkUploadDialog({
               <Input id="progress-file" type="file" accept=".csv" onChange={(e) => handleFileChange(e, "progress")} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Required: `day` (e.g., D1), `ticketId`, `loggedHours`, `status`. Optional for new tickets: `title`, `scope`, `type`, `estimation`.
+              Required: `day`, `ticketId`, `loggedHours`, `status`. Optional for new tickets: `title`, `description`, `scope`, `type`, `estimation`, `tags`.
             </p>
             <div className="flex justify-between items-center">
                  <Button variant="link" size="sm" className="p-0" onClick={() => downloadSampleCSV("progress")}>

@@ -1,6 +1,7 @@
 
 import type { Sprint, Team } from '@/types';
 import { eachDayOfInterval, isSaturday, isSunday } from 'date-fns';
+import { assigneeConfig } from './config';
 
 export const teams: Team[] = ['Backend', 'iOS', 'Web', 'Android', 'Mobile'];
 
@@ -42,18 +43,18 @@ export const sprints: Sprint[] = [
       'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
     },
     tickets: [
-      { id: 'WIN-5929', title: 'Implement new login flow', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', completionDate: '2024-07-09T10:00:00.000Z', dailyLogs: [{ date: '2024-07-09', loggedHours: 8 }] },
-      { id: 'WIN-5930', title: 'Fix API authentication issue', scope: 'Backend', type: 'Bug', typeScope: 'Run', estimation: 5, timeLogged: 6, status: 'Done', completionDate: '2024-07-10T10:00:00.000Z', dailyLogs: [{ date: '2024-07-10', loggedHours: 6 }] },
-      { id: 'WIN-5931', title: 'Update home screen UI', scope: 'iOS', type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 13, status: 'Done', completionDate: '2024-07-11T10:00:00.000Z', dailyLogs: [{ date: '2024-07-11', loggedHours: 13 }] },
-      { id: 'WIN-5932', title: 'Add push notification support', scope: 'Android', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', completionDate: '2024-07-12T10:00:00.000Z', dailyLogs: [{ date: '2024-07-12', loggedHours: 8 }] },
-      { id: 'WIN-5933', title: 'Refactor user service', scope: 'Backend', type: 'Task', typeScope: 'Build', estimation: 13, timeLogged: 10, status: 'Doing', dailyLogs: [{ date: '2024-07-13', loggedHours: 5 }, { date: '2024-07-14', loggedHours: 5 }] },
-      { id: 'WIN-5934', title: 'Investigate payment gateway errors', scope: 'Web', type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 4, status: 'Doing', dailyLogs: [{ date: '2024-07-14', loggedHours: 4 }] },
-      { id: 'WIN-5935', title: 'Design new profile page', scope: 'Mobile', type: 'User story', typeScope: 'Build', estimation: 5, timeLogged: 0, status: 'To Do', dailyLogs: [] },
-      { id: 'WIN-5936', title: 'Onboarding tutorial implementation', scope: 'iOS', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 0, status: 'To Do', dailyLogs: [] },
-      { id: 'WIN-5937', title: 'Sprint planning & admin', scope: 'Backend', type: 'Buffer', typeScope: 'Sprint', estimation: 10, timeLogged: 5, status: 'Doing', dailyLogs: [{ date: '2024-07-08', loggedHours: 5 }] },
-      { id: 'WIN-5938', title: 'Add new endpoint for user data', scope: 'Backend', type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 8 }] },
-      { id: 'WIN-5939', title: 'Optimize image loading on Android', scope: 'Android', type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 5, status: 'Done', completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 5 }] },
-      { id: 'WIN-5940', title: 'Fix CSS bug on marketing page', scope: 'Web', type: 'Bug', typeScope: 'Run', estimation: 3, timeLogged: 3, status: 'Done', completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 3 }] },
+      { id: 'WIN-5929', title: 'Implement new login flow', description: 'Create secure login/logout functionality with JWT tokens and password reset.', scope: 'Web', assignee: assigneeConfig.Web, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['auth', 'frontend'], completionDate: '2024-07-09T10:00:00.000Z', dailyLogs: [{ date: '2024-07-09', loggedHours: 8 }] },
+      { id: 'WIN-5930', title: 'Fix API authentication issue', description: 'Users are unable to log in due to a token validation error in the main API.', scope: 'Backend', assignee: assigneeConfig.Backend, type: 'Bug', typeScope: 'Run', estimation: 5, timeLogged: 6, status: 'Done', tags: ['bug', 'security'], completionDate: '2024-07-10T10:00:00.000Z', dailyLogs: [{ date: '2024-07-10', loggedHours: 6 }] },
+      { id: 'WIN-5931', title: 'Update home screen UI', description: 'Redesign the home screen to include new promotional banners and a carousel.', scope: 'iOS', assignee: assigneeConfig.iOS, type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 13, status: 'Done', tags: ['ui', 'ux'], completionDate: '2024-07-11T10:00:00.000Z', dailyLogs: [{ date: '2024-07-11', loggedHours: 13 }] },
+      { id: 'WIN-5932', title: 'Add push notification support', description: 'Integrate with Firebase Cloud Messaging to enable push notifications.', scope: 'Android', assignee: assigneeConfig.Android, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['notifications', 'firebase'], completionDate: '2024-07-12T10:00:00.000Z', dailyLogs: [{ date: '2024-07-12', loggedHours: 8 }] },
+      { id: 'WIN-5933', title: 'Refactor user service', description: 'Improve the performance and maintainability of the user management service.', scope: 'Backend', assignee: assigneeConfig.Backend, type: 'Task', typeScope: 'Build', estimation: 13, timeLogged: 10, status: 'Doing', tags: ['refactor', 'backend'], dailyLogs: [{ date: '2024-07-13', loggedHours: 5 }, { date: '2024-07-14', loggedHours: 5 }] },
+      { id: 'WIN-5934', title: 'Investigate payment gateway errors', description: 'Users are reporting intermittent failures during the checkout process.', scope: 'Web', assignee: assigneeConfig.Web, type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 4, status: 'Doing', tags: ['payments', 'investigation'], dailyLogs: [{ date: '2024-07-14', loggedHours: 4 }] },
+      { id: 'WIN-5935', title: 'Design new profile page', description: 'Create mockups and prototypes for the new user profile page.', scope: 'Mobile', assignee: assigneeConfig.Mobile, type: 'User story', typeScope: 'Build', estimation: 5, timeLogged: 0, status: 'To Do', tags: ['design', 'mobile'], dailyLogs: [] },
+      { id: 'WIN-5936', title: 'Onboarding tutorial implementation', description: 'Build the multi-step tutorial for new users on iOS.', scope: 'iOS', assignee: assigneeConfig.iOS, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 0, status: 'To Do', tags: ['onboarding', 'ux'], dailyLogs: [] },
+      { id: 'WIN-5937', title: 'Sprint planning & admin', description: 'Buffer time for sprint ceremonies and administrative tasks.', scope: 'Backend', assignee: assigneeConfig.Backend, type: 'Buffer', typeScope: 'Sprint', estimation: 10, timeLogged: 5, status: 'Doing', tags: ['admin', 'planning'], dailyLogs: [{ date: '2024-07-08', loggedHours: 5 }] },
+      { id: 'WIN-5938', title: 'Add new endpoint for user data', description: 'Create a new GET endpoint to fetch user profile information.', scope: 'Backend', assignee: assigneeConfig.Backend, type: 'User story', typeScope: 'Build', estimation: 8, timeLogged: 8, status: 'Done', tags: ['api'], completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 8 }] },
+      { id: 'WIN-5939', title: 'Optimize image loading on Android', description: 'Improve image loading times and reduce memory usage on the main feed.', scope: 'Android', assignee: assigneeConfig.Android, type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 5, status: 'Done', tags: ['performance', 'android'], completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 5 }] },
+      { id: 'WIN-5940', title: 'Fix CSS bug on marketing page', description: 'The main banner on the marketing page is misaligned on mobile devices.', scope: 'Web', assignee: assigneeConfig.Web, type: 'Bug', typeScope: 'Run', estimation: 3, timeLogged: 3, status: 'Done', tags: ['css', 'bugfix'], completionDate: '2024-07-15T10:00:00.000Z', dailyLogs: [{ date: '2024-07-15', loggedHours: 3 }] },
     ],
   },
   {
@@ -73,10 +74,10 @@ export const sprints: Sprint[] = [
       'Out of Scope': { plannedBuild: 0, plannedRun: 0 },
     },
     tickets: [
-      { id: 'WIN-6001', title: 'User profile page redesign', scope: 'Web', type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 0, status: 'To Do', dailyLogs: [] },
-      { id: 'WIN-6002', title: 'Database migration script', scope: 'Backend', type: 'Task', typeScope: 'Build', estimation: 21, timeLogged: 0, status: 'To Do', dailyLogs: [] },
-      { id: 'WIN-6003', title: 'iOS 18 compatibility fixes', scope: 'iOS', type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 0, status: 'To Do', dailyLogs: [] },
-      { id: 'WIN-6004', title: 'Improve Android app startup time', scope: 'Android', type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 0, status: 'To Do', dailyLogs: [] },
+      { id: 'WIN-6001', title: 'User profile page redesign', description: 'Implement the approved designs for the new user profile page.', scope: 'Web', assignee: assigneeConfig.Web, type: 'User story', typeScope: 'Build', estimation: 13, timeLogged: 0, status: 'To Do', tags: ['ui', 'frontend'], dailyLogs: [] },
+      { id: 'WIN-6002', title: 'Database migration script', description: 'Write and test a script to migrate legacy data to the new database schema.', scope: 'Backend', assignee: assigneeConfig.Backend, type: 'Task', typeScope: 'Build', estimation: 21, timeLogged: 0, status: 'To Do', tags: ['database', 'migration'], dailyLogs: [] },
+      { id: 'WIN-6003', title: 'iOS 18 compatibility fixes', description: 'Address UI bugs and crashes reported on the iOS 18 beta.', scope: 'iOS', assignee: assigneeConfig.iOS, type: 'Task', typeScope: 'Run', estimation: 8, timeLogged: 0, status: 'To Do', tags: ['ios', 'compatibility'], dailyLogs: [] },
+      { id: 'WIN-6004', title: 'Improve Android app startup time', description: 'Profile and optimize the app startup sequence to improve performance.', scope: 'Android', assignee: assigneeConfig.Android, type: 'Task', typeScope: 'Run', estimation: 5, timeLogged: 0, status: 'To Do', tags: ['performance', 'android'], dailyLogs: [] },
     ],
   },
 ];

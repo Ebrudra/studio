@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -16,7 +17,9 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { scopes, ticketTypes, typeScopes, statuses } from "./data"
+import { assigneeConfig } from "@/lib/config"
 import type { Ticket, TicketStatus, TicketType, TicketTypeScope, Team } from "@/types"
 
 interface EditTaskDialogProps {
@@ -29,26 +32,28 @@ interface EditTaskDialogProps {
 const formSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
+  description: z.string().optional(),
   scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]]),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
   status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
+  tags: z.string().optional(),
 })
 
 export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTaskDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    // timeLogged is not editable here, so we don't include it in defaultValues
-    // that are based on the form schema.
     defaultValues: {
       id: task.id,
       title: task.title,
+      description: task.description,
       scope: task.scope,
       type: task.type,
       typeScope: task.typeScope,
       estimation: task.estimation,
       status: task.status,
+      tags: task.tags?.join(', '),
     },
   })
   
@@ -58,11 +63,13 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
     form.reset({
       id: task.id,
       title: task.title,
+      description: task.description,
       scope: task.scope,
       type: task.type,
       typeScope: task.typeScope,
       estimation: task.estimation,
       status: task.status,
+      tags: task.tags?.join(', '),
     })
   }, [task, form])
 
@@ -78,8 +85,17 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
 
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const assignee = assigneeConfig[values.scope];
+    const tags = values.tags ? values.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
+    
     // We spread the original task to keep fields like timeLogged and dailyLogs intact
-    const updatedTaskData = { ...task, ...values, title: values.title || task.id };
+    const updatedTaskData = { 
+        ...task, 
+        ...values, 
+        title: values.title || task.id,
+        assignee,
+        tags
+    };
     onUpdateTask(updatedTaskData)
     setIsOpen(false)
   }
@@ -131,6 +147,19 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                   <FormLabel>Title</FormLabel>
                   <FormControl>
                     <Input placeholder="Implement feature X" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Provide a detailed description of the task..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -212,6 +241,19 @@ export function EditTaskDialog({ isOpen, setIsOpen, task, onUpdateTask }: EditTa
                 )}
               />
             </div>
+             <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags</FormLabel>
+                  <FormControl>
+                    <Input placeholder="feature, auth, frontend" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <DialogFooter>
                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>

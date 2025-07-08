@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -16,7 +17,9 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { scopes, ticketTypes, typeScopes, statuses } from "./data"
+import { assigneeConfig } from "@/lib/config"
 import type { Ticket, TicketStatus, TicketType, TicketTypeScope, Team } from "@/types"
 
 interface AddTaskDialogProps {
@@ -28,11 +31,13 @@ interface AddTaskDialogProps {
 const formSchema = z.object({
   id: z.string().regex(/^WIN-\d+$/, "Ticket ID must be in WIN-XXXX format"),
   title: z.string().optional(),
+  description: z.string().optional(),
   scope: z.enum(scopes.map(s => s.value) as [Team, ...Team[]]),
   type: z.enum(ticketTypes.map(t => t.value) as [TicketType, ...TicketType[]]),
   typeScope: z.enum(typeScopes.map(ts => ts.value) as [TicketTypeScope, ...TicketTypeScope[]]),
   estimation: z.coerce.number().min(0, "Estimation must be a positive number"),
   status: z.enum(statuses.map(s => s.value) as [TicketStatus, ...TicketTypeStatus[]]),
+  tags: z.string().optional(),
 })
 
 export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogProps) {
@@ -41,11 +46,13 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
     defaultValues: {
       id: "WIN-",
       title: "",
+      description: "",
       estimation: 0,
       status: "To Do",
       scope: undefined,
       type: undefined,
       typeScope: undefined,
+      tags: "",
     },
   })
 
@@ -63,9 +70,14 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
 
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const assignee = assigneeConfig[values.scope];
+    const tags = values.tags ? values.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
+    
     const taskData = {
       ...values,
       title: values.title || values.id,
+      assignee,
+      tags,
     };
     onAddTask({ ...taskData, timeLogged: 0 })
     setIsOpen(false)
@@ -119,6 +131,19 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                   <FormLabel>Title</FormLabel>
                   <FormControl>
                     <Input placeholder="Implement feature X" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Provide a detailed description of the task..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -200,6 +225,19 @@ export function AddTaskDialog({ isOpen, setIsOpen, onAddTask }: AddTaskDialogPro
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags</FormLabel>
+                  <FormControl>
+                    <Input placeholder="feature, auth, frontend" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <DialogFooter>
                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>

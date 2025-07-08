@@ -4,6 +4,7 @@
 import * as React from 'react';
 import { useMemo, useState, useEffect } from 'react';
 import { sprints as initialSprints, teams } from '@/lib/data';
+import { assigneeConfig } from '@/lib/config';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -353,6 +354,9 @@ export default function SprintDashboard() {
             dailyLogs: [newLog],
             timeLogged: newLog.loggedHours,
             creationDate: new Date(logDate).toISOString().split('T')[0],
+            description: data.description,
+            tags: data.tags,
+            assignee: assigneeConfig[data.scope],
           };
           if (newTicket.type === 'Bug' || newTicket.type === 'Buffer') {
             newTicket.estimation = newTicket.timeLogged;
@@ -413,10 +417,12 @@ export default function SprintDashboard() {
 
         const canonicalScope = teams.find(t => t.toLowerCase() === task.scope.toLowerCase()) || 'Out of Scope';
         const estimation = Number(task.estimation) || 0;
+        const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
 
         return {
           id: task.id,
           title: task.title || task.id,
+          description: task.description,
           scope: canonicalScope,
           type: task.type,
           estimation: estimation,
@@ -425,6 +431,8 @@ export default function SprintDashboard() {
           dailyLogs: [],
           status: 'To Do',
           creationDate: new Date().toISOString().split('T')[0],
+          assignee: assigneeConfig[canonicalScope],
+          tags: tags,
         };
       });
 
@@ -475,10 +483,12 @@ export default function SprintDashboard() {
           
           const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
           const canonicalScope = teams.find(t => t.toLowerCase() === log.scope!.toLowerCase()) || 'Out of Scope';
+          const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
           ticket = {
             id: log.ticketId,
             title: log.title || log.ticketId,
+            description: log.description,
             scope: canonicalScope,
             type: log.type,
             typeScope: typeScope,
@@ -488,6 +498,8 @@ export default function SprintDashboard() {
             dailyLogs: [],
             isOutOfScope: log.scope === 'Out of Scope',
             creationDate: new Date(logDate).toISOString().split('T')[0],
+            assignee: assigneeConfig[canonicalScope],
+            tags: tags,
           };
           sprintToUpdate.tickets.push(ticket);
           newTicketsCount++;
@@ -692,7 +704,7 @@ export default function SprintDashboard() {
             <Button onClick={() => setIsNewSprintOpen(true)} variant="outline"><Plus className="mr-2 h-4 w-4" />New Sprint</Button>
             <Button variant="outline" onClick={() => window.open(`/report?sprintId=${selectedSprintId}`, '_blank')} disabled={!selectedSprintId}>
                 <FileText className="mr-2 h-4 w-4" />
-                Generate Report
+                View Report
             </Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
