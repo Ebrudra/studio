@@ -33,7 +33,6 @@ import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { InsightBulb } from './insight-bulb';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
 export default function SprintDashboard() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
@@ -735,55 +734,43 @@ export default function SprintDashboard() {
         </div>
        )}
 
+      <div className="space-y-6">
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                    Sprint Tasks
+                    <Badge variant="outline">{processedSprint.tickets.length}</Badge>
+                </CardTitle>
 
-      <Tabs defaultValue="tasks" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="tasks">Sprint Tasks</TabsTrigger>
-            <TabsTrigger value="charts">Charts & Analytics</TabsTrigger>
-            <TabsTrigger value="capacity">Team Capacity</TabsTrigger>
-            <TabsTrigger value="progress">Daily Progress</TabsTrigger>
-        </TabsList>
-        <TabsContent value="tasks" className="mt-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        Sprint Tasks
-                        <Badge variant="outline">{processedSprint.tickets.length}</Badge>
-                    </CardTitle>
+                <div className="flex items-center gap-2">
+                    {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
+                    <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Bulk Upload
+                    </Button>
+                    <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Log Progress
+                    </Button>
+                    <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Task
+                    </Button>
+                </div>
+                </div>
+            </CardHeader>
+          <CardContent>
+              <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+          </CardContent>
+       </Card>
 
-                    <div className="flex items-center gap-2">
-                        {previousSprints && <Button onClick={handleRollback} variant="destructive" size="sm"><History className="mr-2 h-4 w-4" /> Rollback</Button>}
-                        <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Bulk Upload
-                        </Button>
-                        <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
-                            <FileText className="w-4 h-4 mr-2" />
-                            Log Progress
-                        </Button>
-                        <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Task
-                        </Button>
-                    </div>
-                    </div>
-                </CardHeader>
-              <CardContent>
-                  <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
-              </CardContent>
-           </Card>
-        </TabsContent>
-        <TabsContent value="charts" className="mt-6">
-             <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
-        </TabsContent>
-        <TabsContent value="capacity" className="mt-6">
-            <TeamCapacityTable sprint={processedSprint} />
-        </TabsContent>
-        <TabsContent value="progress" className="mt-6">
-            <TeamDailyProgress dailyProgress={dailyProgressData} />
-        </TabsContent>
-      </Tabs>
+        <SprintCharts sprint={processedSprint} allSprints={sprints} dailyProgress={dailyProgressData} />
+        
+        <TeamCapacityTable sprint={processedSprint} />
+
+        <TeamDailyProgress dailyProgress={dailyProgressData} />
+      </div>
     </div>
   );
 }
