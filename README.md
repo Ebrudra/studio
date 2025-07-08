@@ -35,14 +35,24 @@ This application requires a Firebase project to use Firestore.
 
 The application needs your Firebase project configuration and a Google Gemini API key.
 
-1.  Get your free Gemini API key from **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
-2.  In the project's root directory, make a copy of the `.env` file and rename it to `.env.local`.
-3.  Open your new `.env.local` file.
-4.  Add your Gemini API key:
+1.  **Get your Gemini API Key**:
+    *   Get your free Gemini API key from **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
+
+2.  **Create your local environment file**:
+    *   In the project's root directory, make a copy of the `.env` file and rename it to `.env.local`.
+
+3.  **Add your API Key to `.env.local`**:
     ```
     GOOGLE_API_KEY=YOUR_API_KEY_HERE
     ```
-5.  Add your Firebase configuration values from Step 3:
+
+4.  **Find and Add your Firebase Keys to `.env.local`**:
+    *   Go to the [Firebase Console](https://console.firebase.google.com/) and select your project.
+    *   Click the gear icon (⚙️) next to "Project Overview" and select **Project settings**.
+    *   Scroll down to the **"Your apps"** card.
+    *   In the **"SDK setup and configuration"** section, select the **Config** radio button.
+    *   You will see a `firebaseConfig` object. Copy the values from this object into your `.env.local` file like so:
+
     ```
     NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-auth-domain
