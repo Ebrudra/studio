@@ -125,7 +125,8 @@ export default function SprintDashboard() {
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    const tickets = selectedSprint.tickets.map(ticket => 
+    const sprintTickets = selectedSprint.tickets || [];
+    const tickets = sprintTickets.map(ticket => 
         (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
     );
 
@@ -149,10 +150,11 @@ export default function SprintDashboard() {
 
   const dailyProgressData = useMemo((): DailyProgressData[] => {
     if (!selectedSprint) return [];
-    
+
+    const sprintTickets = selectedSprint.tickets || [];
     const dataByDate = new Map<string, Record<Team, { build: number; run: number; buffer: number }>>();
     
-    for (const ticket of selectedSprint.tickets) {
+    for (const ticket of sprintTickets) {
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
                 if (!dataByDate.has(log.date)) {
@@ -316,7 +318,7 @@ export default function SprintDashboard() {
   const handleLogProgress = async (data: LogProgressData) => {
     if (!selectedSprint) return;
 
-    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets));
+    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
     const isNewTicket = data.ticketId === 'new-ticket';
     const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
     let ticket = newTickets.find((t: Ticket) => t.id === ticketId);
@@ -388,7 +390,7 @@ export default function SprintDashboard() {
   
   const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
     if (!selectedSprint) return;
-    const existingTicketIds = new Set(selectedSprint.tickets.map(t => t.id));
+    const existingTicketIds = new Set((selectedSprint.tickets || []).map(t => t.id));
     const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
     const addedCount = uniqueNewTickets.length;
     
@@ -421,7 +423,7 @@ export default function SprintDashboard() {
       });
 
     if (newTickets.length > 0) {
-      await handleUpdateSprint({ tickets: [...selectedSprint.tickets, ...newTickets]});
+      await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]});
     }
     toast({ title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
   };
@@ -431,7 +433,7 @@ export default function SprintDashboard() {
     let processedCount = 0;
     let newTicketsCount = 0;
     
-    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets));
+    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
     const dayToDateMap = new Map<number, string>();
     (selectedSprint.sprintDays || []).forEach(d => dayToDateMap.set(d.day, d.date));
       
@@ -785,7 +787,7 @@ export default function SprintDashboard() {
                           <div className="flex items-center justify-between">
                               <CardTitle className="flex items-center gap-2">
                                   Sprint Tasks
-                                  <Badge variant="outline">{processedSprint.tickets.length}</Badge>
+                                  <Badge variant="outline">{(processedSprint.tickets || []).length}</Badge>
                               </CardTitle>
 
                               <div className="flex items-center gap-2">
@@ -805,7 +807,7 @@ export default function SprintDashboard() {
                           </div>
                       </CardHeader>
                       <CardContent>
-                          <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={(taskId) => { if (window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)) { handleDeleteTask(taskId); } }} onLogTime={handleLogRowAction} sprint={processedSprint} />
+                          <SprintTasksView columns={columns} data={processedSprint.tickets || []} onUpdateTask={handleUpdateTask} onDeleteTask={(taskId) => { if (window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)) { handleDeleteTask(taskId); } }} onLogTime={handleLogRowAction} sprint={processedSprint} />
                       </CardContent>
                   </Card>
               </TabsContent>
