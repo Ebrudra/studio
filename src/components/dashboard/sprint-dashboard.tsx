@@ -91,25 +91,28 @@ export default function SprintDashboard() {
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   const { toast } = useToast();
-
-  useEffect(() => {
-    const initialLoad = async () => {
-      setIsLoading(true);
-      try {
+  
+  const fetchSprints = useCallback(async () => {
+    setIsLoading(true);
+    try {
         const sprintsFromFs = await getSprints();
         setSprints(sprintsFromFs);
-        if (sprintsFromFs.length > 0) {
-            setSelectedSprintId(currentId => currentId ?? sprintsFromFs[0].id);
+        if (sprintsFromFs.length > 0 && !selectedSprintId) {
+            setSelectedSprintId(sprintsFromFs[0].id);
+        } else if (sprintsFromFs.length === 0) {
+            setSelectedSprintId(undefined);
         }
-      } catch (err) {
+    } catch (err) {
         console.error("Failed to fetch sprints:", err);
-        toast({ variant: "destructive", title: "Error", description: "Could not load sprints from local storage." });
-      } finally {
+        toast({ variant: "destructive", title: "Error", description: "Could not load sprints." });
+    } finally {
         setIsLoading(false);
-      }
-    };
-    initialLoad();
-  }, [toast]);
+    }
+  }, [toast, selectedSprintId]);
+
+  useEffect(() => {
+    fetchSprints();
+  }, []);
   
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
@@ -252,9 +255,8 @@ export default function SprintDashboard() {
   const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
-        const sprintsFromFs = await getSprints();
-        setSprints(sprintsFromFs);
         setSelectedSprintId(newSprint.id);
+        await fetchSprints();
         toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
@@ -265,8 +267,8 @@ export default function SprintDashboard() {
   const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>) => {
     if (!selectedSprintId) return;
     try {
-        const updatedSprint = await updateSprint(selectedSprintId, updatedSprintData);
-        setSprints(prevSprints => prevSprints.map(s => s.id === selectedSprintId ? updatedSprint : s));
+        await updateSprint(selectedSprintId, updatedSprintData);
+        await fetchSprints();
         toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
     } catch (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to update sprint." });
@@ -560,7 +562,7 @@ export default function SprintDashboard() {
     if (!selectedSprintId) return;
     try {
         const syncedSprint = await syncSprint(selectedSprintId);
-        setSprints(prevSprints => prevSprints.map(s => s.id === selectedSprintId ? syncedSprint : s));
+        await fetchSprints();
         toast({ title: "Sprint Synced", description: "Sprint has been backed up to Firebase." });
     } catch (error) {
         console.error("Failed to sync sprint:", error);
