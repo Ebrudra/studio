@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { teams } from '@/lib/data';
+import { teams as platformTeams } from "./data";
 import { assigneeConfig } from '@/lib/config';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
@@ -15,7 +15,7 @@ import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket, CloudUpload } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -33,8 +33,7 @@ import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { InsightBulb } from './insight-bulb';
-import { getSprints, addSprint, updateSprint, deleteSprint as deleteSprintFromDb } from '@/lib/firebase/sprints';
+import { getSprints, addSprint, updateSprint, deleteSprint, syncSprint } from '@/actions/sprints';
 
 const SprintScopingView = ({
   sprint,
@@ -96,12 +95,12 @@ export default function SprintDashboard() {
   const fetchSprints = useCallback(async () => {
     setIsLoading(true);
     try {
-      const sprintsFromDb = await getSprints();
-      setSprints(sprintsFromDb);
-      return sprintsFromDb;
+      const sprintsFromFs = await getSprints();
+      setSprints(sprintsFromFs);
+      return sprintsFromFs;
     } catch (err) {
       console.error("Failed to fetch sprints:", err);
-      toast({ variant: "destructive", title: "Error", description: "Could not load sprints from the database." });
+      toast({ variant: "destructive", title: "Error", description: "Could not load sprints from local storage." });
       return [];
     } finally {
       setIsLoading(false);
@@ -110,23 +109,13 @@ export default function SprintDashboard() {
   
   useEffect(() => {
     const initialLoad = async () => {
-        setIsLoading(true);
-        try {
-            const sprintsFromDb = await getSprints();
-            setSprints(sprintsFromDb);
-            if (sprintsFromDb.length > 0) {
-                // On initial load, if no sprint is selected, select the first one.
-                setSelectedSprintId(currentId => currentId ?? sprintsFromDb[0].id);
-            }
-        } catch (err) {
-            console.error("Failed to fetch sprints:", err);
-            toast({ variant: "destructive", title: "Error", description: "Could not load sprints from the database." });
-        } finally {
-            setIsLoading(false);
+        const sprintsFromFs = await fetchSprints();
+        if (sprintsFromFs.length > 0) {
+            setSelectedSprintId(currentId => currentId ?? sprintsFromFs[0].id);
         }
     }
     initialLoad();
-  }, [toast]); // This effect should only run once on mount.
+  }, [fetchSprints]);
   
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
@@ -167,7 +156,7 @@ export default function SprintDashboard() {
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
                 if (!dataByDate.has(log.date)) {
-                    dataByDate.set(log.date, teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>));
+                    dataByDate.set(log.date, platformTeams.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
                 if(dayData[ticket.platform]) {
@@ -186,7 +175,7 @@ export default function SprintDashboard() {
     return (selectedSprint.sprintDays || []).map(dayInfo => ({
         day: dayInfo.day,
         date: dayInfo.date,
-        progress: dataByDate.get(dayInfo.date) || teams.reduce((acc, team) => ({...acc, [team]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>)
+        progress: dataByDate.get(dayInfo.date) || platformTeams.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>)
     }));
   }, [selectedSprint]);
 
@@ -264,38 +253,33 @@ export default function SprintDashboard() {
 
   }, [sprints, selectedSprint, processedSprint]);
   
-  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
-    const newSprint: Omit<Sprint, 'id'> = {
-      ...newSprintData,
-      tickets: [],
-      generatedReport: undefined,
-    };
+  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id'>) => {
     try {
-        const newId = await addSprint(newSprint);
+        const newSprint = await addSprint(newSprintData);
         await fetchSprints();
-        setSelectedSprintId(newId);
+        setSelectedSprintId(newSprint.id);
+        toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
        console.error("Error creating sprint:", error);
     }
   };
   
-  const handleUpdateSprint = async (updatedSprintData: Sprint) => {
-    await updateSprint(updatedSprintData.id, updatedSprintData);
-    await fetchSprints();
-    toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
-  };
-
-  const updateSelectedSprint = async (updatedData: Partial<Omit<Sprint, 'id'>>) => {
+  const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>) => {
     if (!selectedSprintId) return;
-    const dataToUpdate = { ...updatedData, lastUpdatedAt: new Date().toISOString() };
-    await updateSprint(selectedSprintId, dataToUpdate);
-    await fetchSprints();
-  }
+    try {
+        await updateSprint(selectedSprintId, updatedSprintData);
+        await fetchSprints();
+        toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
+    } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to update sprint." });
+        console.error("Error updating sprint:", error);
+    }
+  };
 
   const handleAddTask = async (newTaskData: Omit<Ticket, "timeLogged">) => {
     if (!selectedSprint) return;
-    const isOutOfScope = selectedSprint?.status === 'Active' && newTaskData.typeScope === 'Build';
+    const isOutOfScope = selectedSprint.status === 'Active' && newTaskData.typeScope === 'Build';
     const newTask: Ticket = {
       ...newTaskData,
       title: newTaskData.title || newTaskData.id,
@@ -304,7 +288,7 @@ export default function SprintDashboard() {
       creationDate: new Date().toISOString().split('T')[0],
       isOutOfScope,
     };
-    await updateSelectedSprint({ tickets: [...selectedSprint.tickets, newTask] });
+    await handleUpdateSprint({ tickets: [...selectedSprint.tickets, newTask] });
   };
 
   const handleUpdateTask = async (updatedTask: Ticket) => {
@@ -314,16 +298,14 @@ export default function SprintDashboard() {
       finalTask.estimation = finalTask.timeLogged;
     }
     const newTickets = selectedSprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
-    await updateSelectedSprint({ tickets: newTickets });
+    await handleUpdateSprint({ tickets: newTickets });
   };
 
   const handleDeleteTask = async (taskId: string) => {
     if (!selectedSprint) return;
-    if(window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)){
-        const newTickets = selectedSprint.tickets.filter(t => t.id !== taskId);
-        await updateSelectedSprint({ tickets: newTickets });
-        toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
-    }
+    const newTickets = selectedSprint.tickets.filter(t => t.id !== taskId);
+    await handleUpdateSprint({ tickets: newTickets });
+    toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
   };
   
   const handleLogRowAction = (task: Ticket) => {
@@ -361,8 +343,8 @@ export default function SprintDashboard() {
         dailyLogs: [newLog],
         timeLogged: newLog.loggedHours,
         creationDate: new Date(logDate).toISOString().split('T')[0],
-        description: data.description,
-        tags: data.tags,
+        description: data.newTicketDescription,
+        tags: data.newTicketTags ? data.newTicketTags.split(',').map(t => t.trim()) : [],
         assignee: assigneeConfig[data.platform],
         isOutOfScope,
       };
@@ -401,7 +383,7 @@ export default function SprintDashboard() {
         delete ticket.completionDate;
       }
     }
-    await updateSelectedSprint({ tickets: newTickets });
+    await handleUpdateSprint({ tickets: newTickets });
   };
   
   const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
@@ -416,7 +398,7 @@ export default function SprintDashboard() {
         else if (task.type === 'Buffer') typeScope = 'Sprint';
 
         const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
-        const canonicalPlatform = teams.find(t => t.toLowerCase() === task.platform.toLowerCase()) || 'Web';
+        const canonicalPlatform = platformTeams.find(t => t.value.toLowerCase() === task.platform.toLowerCase())?.value || 'Web';
         const estimation = Number(task.estimation) || 0;
         const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
 
@@ -439,7 +421,7 @@ export default function SprintDashboard() {
       });
 
     if (newTickets.length > 0) {
-      await updateSelectedSprint({ tickets: [...selectedSprint.tickets, ...newTickets]});
+      await handleUpdateSprint({ tickets: [...selectedSprint.tickets, ...newTickets]});
     }
     toast({ title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
   };
@@ -480,7 +462,7 @@ export default function SprintDashboard() {
         
         const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
         const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
-        const canonicalPlatform = teams.find(t => t.toLowerCase() === log.platform!.toLowerCase()) || 'Web';
+        const canonicalPlatform = platformTeams.find(t => t.value.toLowerCase() === log.platform!.toLowerCase())?.value || 'Web';
         const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
         ticket = {
@@ -538,7 +520,7 @@ export default function SprintDashboard() {
         }
     });
 
-    await updateSelectedSprint({ tickets: newTickets });
+    await handleUpdateSprint({ tickets: newTickets });
     toast({
       title: "Progress Log Upload Complete",
       description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
@@ -547,14 +529,14 @@ export default function SprintDashboard() {
   
   const handleClearData = async () => {
     if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
-      await updateSelectedSprint({ tickets: [], generatedReport: undefined });
+      await handleUpdateSprint({ tickets: [], reportFilePaths: [] });
       toast({ title: "Sprint Data Cleared", description: "All tickets and logs have been removed." });
     }
   };
 
   const handleCompleteSprint = async () => {
     if (window.confirm("Are you sure you want to complete this sprint? You will no longer be able to edit it.")) {
-      await updateSelectedSprint({ status: 'Completed' });
+      await handleUpdateSprint({ status: 'Completed' });
       toast({ title: "Sprint Completed", description: "The sprint has been archived." });
     }
   };
@@ -562,7 +544,7 @@ export default function SprintDashboard() {
   const handleDeleteSprint = async () => {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
-      await deleteSprintFromDb(selectedSprintId);
+      await deleteSprint(selectedSprintId);
       const remainingSprints = await fetchSprints();
       setSelectedSprintId(remainingSprints.length > 0 ? remainingSprints[0].id : undefined);
       toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
@@ -571,8 +553,20 @@ export default function SprintDashboard() {
 
   const handleFinalizeScope = async () => {
     if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
-      await updateSelectedSprint({ status: 'Active' });
+      await handleUpdateSprint({ status: 'Active' });
       toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
+    }
+  };
+
+   const handleSyncToFirebase = async () => {
+    if (!selectedSprintId) return;
+    try {
+        await syncSprint(selectedSprintId);
+        await fetchSprints(); // Refetch to update the UI with sync status
+        toast({ title: "Sprint Synced", description: "Sprint has been backed up to Firebase." });
+    } catch (error) {
+        console.error("Failed to sync sprint:", error);
+        toast({ variant: "destructive", title: "Sync Failed", description: "Could not sync sprint to Firebase." });
     }
   };
 
@@ -608,7 +602,7 @@ export default function SprintDashboard() {
                 </CardHeader>
                 <CardContent>
                     <p className="mb-6">
-                        Get started by creating your first sprint. You'll be able to add tasks, log progress, and generate detailed reports in minutes.
+                        Get started by creating your first sprint. All your data will be saved locally on your machine.
                     </p>
                     <Button onClick={() => setIsNewSprintOpen(true)} size="lg">
                         <Plus className="mr-2 h-5 w-5" />
@@ -626,7 +620,7 @@ export default function SprintDashboard() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
        <NewSprintDialog isOpen={isNewSprintOpen} setIsOpen={setIsNewSprintOpen} onCreateSprint={handleCreateSprint} />
-       {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={handleUpdateSprint} />}
+       {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={(s) => handleUpdateSprint(s)} />}
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
        <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUploadTasks} onBulkLogProgress={handleBulkLogProgress} />
@@ -669,6 +663,10 @@ export default function SprintDashboard() {
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleCompleteSprint} disabled={isSprintCompleted}>
                         <Check className="mr-2 h-4 w-4" /> Complete Sprint
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSyncToFirebase} disabled={!selectedSprint || selectedSprint.status !== 'Completed'}>
+                        <CloudUpload className="mr-2 h-4 w-4" />
+                        {selectedSprint?.isSyncedToFirebase ? "Synced to Cloud" : "Sync to Cloud"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleClearData} className="text-destructive" disabled={isSprintCompleted}>
@@ -807,7 +805,7 @@ export default function SprintDashboard() {
                           </div>
                       </CardHeader>
                       <CardContent>
-                          <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} onLogTime={handleLogRowAction} sprint={processedSprint} />
+                          <SprintTasksView columns={columns} data={processedSprint.tickets} onUpdateTask={handleUpdateTask} onDeleteTask={(taskId) => { if (window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)) { handleDeleteTask(taskId); } }} onLogTime={handleLogRowAction} sprint={processedSprint} />
                       </CardContent>
                   </Card>
               </TabsContent>

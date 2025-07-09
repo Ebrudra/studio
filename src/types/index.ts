@@ -50,5 +50,6 @@ export interface Sprint {
   totalCapacity?: number;
   buildCapacity?: number;
   runCapacity?: number;
-  generatedReport?: string;
+  reportFilePaths?: string[];
+  isSyncedToFirebase?: boolean;
 }

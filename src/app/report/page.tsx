@@ -22,8 +22,8 @@ import type { Sprint, Team, Ticket, TicketStatus } from "@/types"
 import { generateSprintReport } from "@/ai/flows/sprint-report-flow"
 import { MarkdownRenderer } from "@/components/report/markdown-renderer"
 import { AIInsights } from "@/components/report/ai-insights"
-import { teams as allTeams } from "@/lib/data"
-import { getSprints, updateSprint } from "@/lib/firebase/sprints"
+import { platforms as allTeams } from "@/components/dashboard/data"
+import { getSprintWithReport, saveReport, getSprints } from "@/actions/sprints"
 
 
 export default function ReportPage() {
@@ -50,9 +50,10 @@ export default function ReportPage() {
     setError("")
     try {
       const result = await generateSprintReport({ sprint: currentSprint, allSprints: sprints })
-      setReportContent(result.report)
+      const { updatedSprint, reportContent: newReportContent } = await saveReport(currentSprint.id, result.report);
       
-      await updateSprint(sprintId, { generatedReport: result.report })
+      setSprint(updatedSprint);
+      setReportContent(newReportContent);
       setGeneratedAt(new Date());
 
     } catch (e: any) {
@@ -71,25 +72,25 @@ export default function ReportPage() {
 
     const fetchReportData = async () => {
         try {
-            const sprints = await getSprints();
-            const currentSprint = sprints.find(s => s.id === sprintId)
+            const allSprintsData = await getSprints();
+            setAllSprints(allSprintsData);
+
+            const { sprint: currentSprint, reportContent: currentReportContent } = await getSprintWithReport(sprintId);
 
             if (currentSprint) {
-                setSprint(currentSprint)
-                setAllSprints(sprints)
-
-                if (currentSprint.generatedReport) {
-                    setReportContent(currentSprint.generatedReport)
-                    setIsLoading(false)
+                setSprint(currentSprint);
+                if (currentReportContent) {
+                    setReportContent(currentReportContent);
+                    setIsLoading(false);
                 } else {
-                    generateReport(currentSprint, sprints)
+                    await generateReport(currentSprint, allSprintsData);
                 }
             } else {
                 setError(`Sprint with ID "${sprintId}" not found.`)
                 setIsLoading(false)
             }
         } catch (e) {
-            setError("Failed to load sprint data from the database.")
+            setError("Failed to load sprint data.")
             setIsLoading(false)
         }
     }
@@ -127,7 +128,7 @@ export default function ReportPage() {
 
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
-                if (allTeams.includes(ticket.platform as Team)) {
+                if (allTeams.some(t => t.value === ticket.platform)) {
                     const delta = dailyDelta.get(log.date)
                     if (delta) {
                         if(isBuild || isRun) delta.loggedHours += log.loggedHours
@@ -216,7 +217,7 @@ export default function ReportPage() {
     // Daily Progress Total
     const dailyProgress = sprint.sprintDays.map(dayInfo => {
         const progress: Record<Team, { build: number; run: number; buffer: number }> = {} as any
-        allTeams.forEach(t => progress[t] = { build: 0, run: 0, buffer: 0 });
+        allTeams.forEach(t => progress[t.value] = { build: 0, run: 0, buffer: 0 });
 
         sprint.tickets.forEach(ticket => {
             ticket.dailyLogs?.forEach(log => {
@@ -234,10 +235,10 @@ export default function ReportPage() {
 
     const dailyTotalSummary = dailyProgress.reduce((acc, day) => {
         allTeams.forEach(team => {
-            if (day.progress[team]) {
-                acc.build += day.progress[team].build;
-                acc.run += day.progress[team].run;
-                acc.buffer += day.progress[team].buffer;
+            if (day.progress[team.value]) {
+                acc.build += day.progress[team.value].build;
+                acc.run += day.progress[team.value].run;
+                acc.buffer += day.progress[team.value].buffer;
             }
         });
         return acc;

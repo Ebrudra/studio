@@ -1,6 +1,12 @@
 # SprintPilot
 
-This is a Next.js and Genkit application built in Firebase Studio. It uses **Firebase Firestore** for data storage.
+This is a Next.js and Genkit application built in Firebase Studio. It uses a local file system for data storage and offers optional cloud sync with **Firebase Firestore**.
+
+## Architecture Overview
+
+SprintPilot uses a **local-first** architecture. All sprint and report data is saved directly to your local file system in a `data/` directory. This makes the application fast and allows for offline use.
+
+For backup and collaboration, you can selectively sync **completed** sprints to a Firebase Firestore database.
 
 ## Running Locally
 
@@ -18,22 +24,9 @@ Open your terminal, navigate into the project directory, and run the following c
 npm install
 ```
 
-### 3. Set Up a Firebase Project
+### 3. Set Up Environment Variables (Optional)
 
-This application requires a Firebase project to use Firestore.
-
-1.  Go to the [Firebase Console](https://console.firebase.google.com/).
-2.  Click **"Add project"** and follow the on-screen instructions to create a new project.
-3.  Once your project is created, navigate to the **Project Overview** page. Click the **Web** icon (`</>`) to add a web app to your project.
-4.  Give your app a nickname and click **"Register app"**.
-5.  Firebase will provide you with a `firebaseConfig` object. You will need these values for the next step.
-6.  In your new project, go to the **Build** section in the left-hand menu and select **Firestore Database**.
-7.  Click **"Create database"**.
-8.  Choose to start in **"test mode"** (this allows easy read/write access for development) and select a location. Click **"Enable"**.
-
-### 4. Set Up Environment Variables
-
-The application needs your Firebase project configuration and a Google Gemini API key.
+If you plan to use the **Firebase sync** feature, you will need a Firebase project and a Google Gemini API key. If you only plan to use local storage, you can skip this step.
 
 1.  **Get your Gemini API Key**:
     *   Get your free Gemini API key from **[Google AI Studio](https://aistudio.google.com/app/apikey)**.
@@ -46,12 +39,24 @@ The application needs your Firebase project configuration and a Google Gemini AP
     GOOGLE_API_KEY=YOUR_API_KEY_HERE
     ```
 
-4.  **Find and Add your Firebase Keys to `.env.local`**:
-    *   Go to the [Firebase Console](https://console.firebase.google.com/) and select your project.
-    *   Click the gear icon (⚙️) next to "Project Overview" and select **Project settings**.
-    *   Scroll down to the **"Your apps"** card.
-    *   In the **"SDK setup and configuration"** section, select the **Config** radio button.
-    *   You will see a `firebaseConfig` object. Copy the values from this object into your `.env.local` file like so:
+### 4. Set Up a Firebase Project (Optional)
+
+To use the cloud sync feature, you need a Firebase project.
+
+1.  Go to the [Firebase Console](https://console.firebase.google.com/).
+2.  Click **"Add project"** and follow the on-screen instructions.
+3.  Once your project is created, navigate to the **Project Overview** page. Click the **Web** icon (`</>`) to add a web app.
+4.  Give your app a nickname and click **"Register app"**.
+5.  Firebase will provide you with a `firebaseConfig` object. You will need these values.
+6.  In your new project, go to the **Build** section and select **Firestore Database**.
+7.  Click **"Create database"**.
+8.  Choose to start in **"test mode"** and select a location. Click **"Enable"**.
+
+### 5. Add Firebase Keys to `.env.local` (Optional)
+
+*   In your Firebase project settings, find the **"SDK setup and configuration"** section.
+*   Select the **Config** radio button to view your `firebaseConfig` object.
+*   Copy these values into your `.env.local` file:
 
     ```
     NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
@@ -62,7 +67,7 @@ The application needs your Firebase project configuration and a Google Gemini AP
     NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
     ```
 
-### 5. Run the Development Servers
+### 6. Run the Development Servers
 
 You will need to run two separate processes in two different terminal windows.
 
@@ -78,10 +83,10 @@ npm run dev
 npm run genkit:dev
 ```
 
-### 6. Open the App
+### 7. Open the App
 
 Once both servers are running, you can open your web browser and navigate to:
 
 [http://localhost:9002](http://localhost:9002)
 
-You should now see the application running locally! You can start by creating your first sprint.
+You can now start creating sprints. The data will be saved in a `data` folder within your project directory.
