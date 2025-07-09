@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { teams as platformTeams } from "./data";
+import { platforms as platformTeams } from "./data";
 import { assigneeConfig } from '@/lib/config';
 import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
 import { format } from "date-fns";
