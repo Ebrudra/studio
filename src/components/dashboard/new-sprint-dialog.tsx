@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 interface NewSprintDialogProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
-  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt' | 'tickets' | 'generatedReport'>) => void
+  onCreateSprint: (sprint: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => void
 }
 
 const formSchema = z.object({
@@ -133,6 +133,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       totalCapacity: totalBuild + totalRun,
       buildCapacity: totalBuild,
       runCapacity: totalRun,
+      tickets: [],
     })
     setIsOpen(false)
     form.reset()

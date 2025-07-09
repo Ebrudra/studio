@@ -64,7 +64,7 @@ export async function getSprintWithReport(sprintId: string): Promise<{ sprint: S
     }
 }
 
-export async function addSprint(sprintData: Omit<Sprint, 'id'>): Promise<Sprint> {
+export async function addSprint(sprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>): Promise<Sprint> {
     await initDataDirs();
     const sprintId = uuidv4();
     const newSprint: Sprint = {

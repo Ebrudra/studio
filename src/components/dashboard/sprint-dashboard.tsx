@@ -253,7 +253,7 @@ export default function SprintDashboard() {
 
   }, [sprints, selectedSprint, processedSprint]);
   
-  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id'>) => {
+  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
         await fetchSprints();
