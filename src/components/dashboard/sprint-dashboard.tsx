@@ -92,30 +92,24 @@ export default function SprintDashboard() {
 
   const { toast } = useToast();
 
-  const fetchSprints = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const sprintsFromFs = await getSprints();
-      setSprints(sprintsFromFs);
-      return sprintsFromFs;
-    } catch (err) {
-      console.error("Failed to fetch sprints:", err);
-      toast({ variant: "destructive", title: "Error", description: "Could not load sprints from local storage." });
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-  
   useEffect(() => {
     const initialLoad = async () => {
-        const sprintsFromFs = await fetchSprints();
+      setIsLoading(true);
+      try {
+        const sprintsFromFs = await getSprints();
+        setSprints(sprintsFromFs);
         if (sprintsFromFs.length > 0) {
             setSelectedSprintId(currentId => currentId ?? sprintsFromFs[0].id);
         }
-    }
+      } catch (err) {
+        console.error("Failed to fetch sprints:", err);
+        toast({ variant: "destructive", title: "Error", description: "Could not load sprints from local storage." });
+      } finally {
+        setIsLoading(false);
+      }
+    };
     initialLoad();
-  }, [fetchSprints]);
+  }, [toast]);
   
   const selectedSprint = useMemo<Sprint | undefined>(
     () => sprints.find((sprint) => sprint.id === selectedSprintId),
@@ -258,7 +252,7 @@ export default function SprintDashboard() {
   const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
-        await fetchSprints();
+        setSprints(prevSprints => [...prevSprints, newSprint].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
         setSelectedSprintId(newSprint.id);
         toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
@@ -270,8 +264,8 @@ export default function SprintDashboard() {
   const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>) => {
     if (!selectedSprintId) return;
     try {
-        await updateSprint(selectedSprintId, updatedSprintData);
-        await fetchSprints();
+        const updatedSprint = await updateSprint(selectedSprintId, updatedSprintData);
+        setSprints(prevSprints => prevSprints.map(s => s.id === selectedSprintId ? updatedSprint : s));
         toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
     } catch (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to update sprint." });
@@ -547,7 +541,8 @@ export default function SprintDashboard() {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
       await deleteSprint(selectedSprintId);
-      const remainingSprints = await fetchSprints();
+      const remainingSprints = sprints.filter(s => s.id !== selectedSprintId);
+      setSprints(remainingSprints);
       setSelectedSprintId(remainingSprints.length > 0 ? remainingSprints[0].id : undefined);
       toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
     }
@@ -563,8 +558,8 @@ export default function SprintDashboard() {
    const handleSyncToFirebase = async () => {
     if (!selectedSprintId) return;
     try {
-        await syncSprint(selectedSprintId);
-        await fetchSprints(); // Refetch to update the UI with sync status
+        const syncedSprint = await syncSprint(selectedSprintId);
+        setSprints(prevSprints => prevSprints.map(s => s.id === selectedSprintId ? syncedSprint : s));
         toast({ title: "Sprint Synced", description: "Sprint has been backed up to Firebase." });
     } catch (error) {
         console.error("Failed to sync sprint:", error);
