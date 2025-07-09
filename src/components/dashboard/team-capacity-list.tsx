@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import type { Sprint, Team } from "@/types"
+import { teams as allTeams } from "@/lib/data"
 
 interface TeamCapacityListProps {
   sprint: Sprint
@@ -21,12 +22,10 @@ interface TeamCapacityListProps {
 
 export function TeamCapacityList({ sprint }: TeamCapacityListProps) {
     const capacityData = useMemo(() => {
-        const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
-
-        return teamsInSprint.map(team => {
-          const teamTickets = (sprint.tickets || []).filter(t => t.platform === team)
+        return allTeams.map(team => {
+          const teamTickets = (sprint.tickets || []).filter(t => t.platform === team.value)
           
-          const capacity = sprint.teamCapacity?.[team];
+          const capacity = sprint.teamCapacity?.[team.value];
           const plannedBuild = capacity?.plannedBuild ?? 0;
           const plannedRun = capacity?.plannedRun ?? 0;
           
@@ -36,7 +35,7 @@ export function TeamCapacityList({ sprint }: TeamCapacityListProps) {
           const totalPlanned = plannedBuild + plannedRun
           const totalDelivered = deliveredBuild + deliveredRun
 
-          return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
+          return { team: team.value, plannedBuild, deliveredBuild, plannedRun, deliveredRun, totalPlanned, totalDelivered }
         })
       }, [sprint])
 

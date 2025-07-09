@@ -48,11 +48,11 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
                 });
             });
         }
-        return allTeams.filter(t => teamSet.has(t));
+        return allTeams.filter(t => teamSet.has(t.value));
       }, [dailyProgress]);
 
       const totals = React.useMemo(() => {
-        const teamTotals: Record<Team, { build: number; run: number; buffer: number; total: number }> = allTeams.reduce((acc, team) => ({ ...acc, [team]: { build: 0, run: 0, buffer: 0, total: 0 } }), {} as any);
+        const teamTotals: Record<string, { build: number; run: number; buffer: number; total: number }> = allTeams.reduce((acc, team) => ({ ...acc, [team.value]: { build: 0, run: 0, buffer: 0, total: 0 } }), {} as any);
         let grandTotalBuild = 0;
         let grandTotalRun = 0;
         let grandTotalBuffer = 0;
@@ -61,11 +61,11 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
         if (dailyProgress) {
             dailyProgress.forEach(day => {
                 allTeams.forEach(team => {
-                    const { build, run, buffer } = day.progress[team] || { build: 0, run: 0, buffer: 0 };
-                    teamTotals[team].build += build;
-                    teamTotals[team].run += run;
-                    teamTotals[team].buffer += buffer;
-                    teamTotals[team].total += (build + run + buffer);
+                    const { build, run, buffer } = day.progress[team.value] || { build: 0, run: 0, buffer: 0 };
+                    teamTotals[team.value].build += build;
+                    teamTotals[team.value].run += run;
+                    teamTotals[team.value].buffer += buffer;
+                    teamTotals[team.value].total += (build + run + buffer);
                 });
             });
         }
@@ -85,14 +85,14 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
             <TableRow>
               <TableHead className="min-w-[50px] sticky left-0 bg-card z-10">Day</TableHead>
               {activeTeams.map(team => (
-                <TableHead key={team} colSpan={4} className="text-center min-w-[300px] border-l">{team}</TableHead>
+                <TableHead key={team.value} colSpan={4} className="text-center min-w-[300px] border-l">{team.label}</TableHead>
               ))}
                <TableHead colSpan={4} className="text-center font-bold min-w-[300px] border-l">Daily Totals</TableHead>
             </TableRow>
              <TableRow className="text-xs text-muted-foreground">
                 <TableHead className="sticky left-0 bg-card z-10"></TableHead>
                 {activeTeams.map(team => (
-                    <React.Fragment key={team}>
+                    <React.Fragment key={team.value}>
                         <TableHead className="text-right border-l">Build</TableHead>
                         <TableHead className="text-right">Run</TableHead>
                         <TableHead className="text-right">Buffer</TableHead>
@@ -107,9 +107,9 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
           </TableHeader>
           <TableBody>
             {dailyProgress.map(day => {
-                const dailyTotalBuild = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.build || 0), 0);
-                const dailyTotalRun = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.run || 0), 0);
-                const dailyTotalBuffer = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.buffer || 0), 0);
+                const dailyTotalBuild = activeTeams.reduce((sum, team) => sum + (day.progress[team.value]?.build || 0), 0);
+                const dailyTotalRun = activeTeams.reduce((sum, team) => sum + (day.progress[team.value]?.run || 0), 0);
+                const dailyTotalBuffer = activeTeams.reduce((sum, team) => sum + (day.progress[team.value]?.buffer || 0), 0);
                 const dailyGrandTotal = dailyTotalBuild + dailyTotalRun + dailyTotalBuffer;
 
                 if (dailyGrandTotal === 0) return null;
@@ -118,11 +118,11 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
                  <TableRow key={day.day}>
                     <TableCell className="font-medium sticky left-0 bg-card z-10">D{day.day}</TableCell>
                     {activeTeams.map(team => {
-                        const teamProgress = day.progress[team] || { build: 0, run: 0, buffer: 0 };
+                        const teamProgress = day.progress[team.value] || { build: 0, run: 0, buffer: 0 };
                         const teamDailyTotal = teamProgress.build + teamProgress.run + teamProgress.buffer;
                         const showWarning = teamDailyTotal > 0 && teamDailyTotal < 8;
                         return (
-                            <React.Fragment key={team}>
+                            <React.Fragment key={team.value}>
                                 <TableCell className="text-right border-l">
                                     {teamProgress.build > 0 ? teamProgress.build.toFixed(1) : ""}
                                 </TableCell>
@@ -164,18 +164,18 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
             <TableRow className="font-bold bg-muted/50">
               <TableCell className="sticky left-0 bg-muted/50 z-10">Grand Total</TableCell>
               {activeTeams.map(team => (
-                <React.Fragment key={team}>
+                <React.Fragment key={team.value}>
                     <TableCell className="text-right border-l">
-                        {totals.teamTotals[team].build > 0 ? totals.teamTotals[team].build.toFixed(1) : ""}
+                        {totals.teamTotals[team.value].build > 0 ? totals.teamTotals[team.value].build.toFixed(1) : ""}
                     </TableCell>
                      <TableCell className="text-right">
-                        {totals.teamTotals[team].run > 0 ? totals.teamTotals[team].run.toFixed(1) : ""}
+                        {totals.teamTotals[team.value].run > 0 ? totals.teamTotals[team.value].run.toFixed(1) : ""}
                     </TableCell>
                     <TableCell className="text-right">
-                        {totals.teamTotals[team].buffer > 0 ? totals.teamTotals[team].buffer.toFixed(1) : ""}
+                        {totals.teamTotals[team.value].buffer > 0 ? totals.teamTotals[team.value].buffer.toFixed(1) : ""}
                     </TableCell>
                     <TableCell className="text-right font-bold">
-                        {totals.teamTotals[team].total > 0 ? totals.teamTotals[team].total.toFixed(1) : ""}
+                        {totals.teamTotals[team.value].total > 0 ? totals.teamTotals[team.value].total.toFixed(1) : ""}
                     </TableCell>
                 </React.Fragment>
               ))}
@@ -201,33 +201,33 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
                 }
             });
         });
-        return allTeams.filter(t => teamSet.has(t));
+        return allTeams.filter(t => teamSet.has(t.value));
     }, [dailyProgress]);
     
     const totalSummary = React.useMemo(() => {
-        const summary: Record<Team, { build: number, run: number, buffer: number, total: number }> = {} as any;
+        const summary: Record<string, { build: number, run: number, buffer: number, total: number }> = {} as any;
         let dailyTotals = { build: 0, run: 0, buffer: 0, total: 0 };
     
         activeTeams.forEach(team => {
-          summary[team] = { build: 0, run: 0, buffer: 0, total: 0 };
+          summary[team.value] = { build: 0, run: 0, buffer: 0, total: 0 };
         });
     
         dailyProgress.forEach(day => {
           activeTeams.forEach(team => {
-            const p = day.progress[team];
+            const p = day.progress[team.value];
             if (p) {
-              summary[team].build += p.build;
-              summary[team].run += p.run;
-              summary[team].buffer += p.buffer;
-              summary[team].total += (p.build + p.run + p.buffer);
+              summary[team.value].build += p.build;
+              summary[team.value].run += p.run;
+              summary[team.value].buffer += p.buffer;
+              summary[team.value].total += (p.build + p.run + p.buffer);
             }
           });
         });
     
-        dailyTotals.build = activeTeams.reduce((sum, team) => sum + summary[team].build, 0);
-        dailyTotals.run = activeTeams.reduce((sum, team) => sum + summary[team].run, 0);
-        dailyTotals.buffer = activeTeams.reduce((sum, team) => sum + summary[team].buffer, 0);
-        dailyTotals.total = activeTeams.reduce((sum, team) => sum + summary[team].total, 0);
+        dailyTotals.build = activeTeams.reduce((sum, team) => sum + summary[team.value].build, 0);
+        dailyTotals.run = activeTeams.reduce((sum, team) => sum + summary[team.value].run, 0);
+        dailyTotals.buffer = activeTeams.reduce((sum, team) => sum + summary[team.value].buffer, 0);
+        dailyTotals.total = activeTeams.reduce((sum, team) => sum + summary[team.value].total, 0);
     
         return { teams: summary, dailyTotals };
       }, [dailyProgress, activeTeams]);
@@ -285,9 +285,9 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     }
 
     const DayCard = ({ dayData }: { dayData: DailyProgressData }) => {
-        const dailyTotalBuild = activeTeams.reduce((sum, team) => sum + (dayData.progress[team]?.build || 0), 0);
-        const dailyTotalRun = activeTeams.reduce((sum, team) => sum + (dayData.progress[team]?.run || 0), 0);
-        const dailyTotalBuffer = activeTeams.reduce((sum, team) => sum + (dayData.progress[team]?.buffer || 0), 0);
+        const dailyTotalBuild = activeTeams.reduce((sum, team) => sum + (dayData.progress[team.value]?.build || 0), 0);
+        const dailyTotalRun = activeTeams.reduce((sum, team) => sum + (dayData.progress[team.value]?.run || 0), 0);
+        const dailyTotalBuffer = activeTeams.reduce((sum, team) => sum + (dayData.progress[team.value]?.buffer || 0), 0);
         const totalHours = dailyTotalBuild + dailyTotalRun + dailyTotalBuffer;
 
         return (
@@ -332,13 +332,13 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
                 <div className="text-sm font-medium text-gray-700">Team Progress</div>
                 <div className="grid grid-cols-2 gap-2">
                   {activeTeams.map(team => {
-                    const teamProgress = dayData.progress[team] || { build: 0, run: 0, buffer: 0 };
+                    const teamProgress = dayData.progress[team.value] || { build: 0, run: 0, buffer: 0 };
                     const teamDailyTotal = teamProgress.build + teamProgress.run + teamProgress.buffer;
                     if (teamDailyTotal === 0) return null;
                     return <TeamProgressCard 
-                        key={team} 
-                        team={team} 
-                        teamName={team} 
+                        key={team.value} 
+                        team={team.value} 
+                        teamName={team.label} 
                         data={{...teamProgress, total: teamDailyTotal, warning: teamDailyTotal > 0 && teamDailyTotal < 8}} />
                     })}
                 </div>
@@ -386,9 +386,9 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
                   <div className="text-sm font-medium text-blue-700">Team Totals</div>
                   <div className="grid grid-cols-2 gap-2">
                     {activeTeams.map(team => {
-                         const teamData = teamTotals[team];
+                         const teamData = teamTotals[team.value];
                          if (!teamData || teamData.total === 0) return null;
-                         return <TeamProgressCard key={team} team={team} teamName={team} data={{...teamData, warning: false}}/>
+                         return <TeamProgressCard key={team.value} team={team.value} teamName={team.label} data={{...teamData, warning: false}}/>
                     })}
                   </div>
                 </div>
@@ -398,7 +398,7 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     }
 
     const activeDays = dailyProgress.filter(day => {
-        const total = activeTeams.reduce((sum, team) => sum + (day.progress[team]?.build || 0) + (day.progress[team]?.run || 0) + (day.progress[team]?.buffer || 0), 0);
+        const total = activeTeams.reduce((sum, team) => sum + (day.progress[team.value]?.build || 0) + (day.progress[team.value]?.run || 0) + (day.progress[team.value]?.buffer || 0), 0);
         return total > 0;
     });
 
@@ -406,7 +406,7 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     const avgHoursPerDay = activeDays.length > 0 ? totalHours / activeDays.length : 0;
     const daysWithWarnings = activeDays.filter(day => 
         activeTeams.some(team => {
-            const p = day.progress[team];
+            const p = day.progress[team.value];
             const total = p.build + p.run + p.buffer;
             return total > 0 && total < 8;
         })

@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle, BarChart2, Target } from "lucide-react"
 import type { Sprint, Team } from "@/types"
+import { teams as allTeams } from "@/lib/data"
 
 interface TeamCapacityCardsProps {
   sprint: Sprint
@@ -119,10 +120,10 @@ export function TeamCapacityCards({ sprint }: TeamCapacityCardsProps) {
   const capacityData = useMemo(() => {
     const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
 
-    return teamsInSprint.map(team => {
-      const teamTickets = (sprint.tickets || []).filter(t => t.platform === team)
+    return allTeams.map(team => {
+      const teamTickets = (sprint.tickets || []).filter(t => t.platform === team.value)
       
-      const capacity = sprint.teamCapacity?.[team];
+      const capacity = sprint.teamCapacity?.[team.value];
       const plannedBuild = capacity?.plannedBuild ?? 0;
       const plannedRun = capacity?.plannedRun ?? 0;
       
@@ -133,7 +134,7 @@ export function TeamCapacityCards({ sprint }: TeamCapacityCardsProps) {
       const totalPlanned = plannedBuild + plannedRun
       const totalDelivered = deliveredBuild + deliveredRun
 
-      return { team, plannedBuild, deliveredBuild, plannedRun, deliveredRun, deliveredBuffer, totalPlanned, totalDelivered }
+      return { team: team.value, plannedBuild, deliveredBuild, plannedRun, deliveredRun, deliveredBuffer, totalPlanned, totalDelivered }
     })
   }, [sprint])
 

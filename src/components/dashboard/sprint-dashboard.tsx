@@ -34,6 +34,7 @@ import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { getSprints, addSprint, updateSprint, deleteSprint, syncSprint } from '@/actions/sprints';
+import { ToastAction } from '../ui/toast';
 
 const SprintScopingView = ({
   sprint,
@@ -108,10 +109,11 @@ export default function SprintDashboard() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, selectedSprintId]);
+  }, [selectedSprintId, toast]);
 
   useEffect(() => {
     fetchSprints();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const selectedSprint = useMemo<Sprint | undefined>(
@@ -255,8 +257,8 @@ export default function SprintDashboard() {
   const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
-        setSelectedSprintId(newSprint.id);
         await fetchSprints();
+        setSelectedSprintId(newSprint.id);
         toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
@@ -387,6 +389,9 @@ export default function SprintDashboard() {
   
   const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
     if (!selectedSprint) return;
+    
+    const originalTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
+    
     const existingTicketIds = new Set((selectedSprint.tickets || []).map(t => t.id));
     const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
     const addedCount = uniqueNewTickets.length;
@@ -422,11 +427,19 @@ export default function SprintDashboard() {
     if (newTickets.length > 0) {
       await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]});
     }
-    toast({ title: "Task Upload Complete", description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.` });
+
+    toast({ 
+        title: "Task Upload Complete", 
+        description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.`,
+        action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets })}>Undo</ToastAction>
+    });
   };
 
   const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
     if (!selectedSprint) return;
+
+    const originalTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
+    
     let processedCount = 0;
     let newTicketsCount = 0;
     
@@ -523,6 +536,7 @@ export default function SprintDashboard() {
     toast({
       title: "Progress Log Upload Complete",
       description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
+      action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets })}>Undo</ToastAction>
     });
   };
   
@@ -544,10 +558,7 @@ export default function SprintDashboard() {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
       await deleteSprint(selectedSprintId);
-      const remainingSprints = await getSprints();
-      setSprints(remainingSprints);
-      setSelectedSprintId(remainingSprints.length > 0 ? remainingSprints[0].id : undefined);
-      toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
+      await fetchSprints();
     }
   };
 
