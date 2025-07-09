@@ -252,7 +252,8 @@ export default function SprintDashboard() {
   const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
-        setSprints(prevSprints => [...prevSprints, newSprint].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+        const sprintsFromFs = await getSprints();
+        setSprints(sprintsFromFs);
         setSelectedSprintId(newSprint.id);
         toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
@@ -541,7 +542,7 @@ export default function SprintDashboard() {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
       await deleteSprint(selectedSprintId);
-      const remainingSprints = sprints.filter(s => s.id !== selectedSprintId);
+      const remainingSprints = await getSprints();
       setSprints(remainingSprints);
       setSelectedSprintId(remainingSprints.length > 0 ? remainingSprints[0].id : undefined);
       toast({ title: "Sprint Deleted", description: "The sprint has been removed." });
@@ -824,5 +825,3 @@ export default function SprintDashboard() {
     </div>
   );
 }
-
-    
