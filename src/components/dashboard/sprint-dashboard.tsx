@@ -65,7 +65,7 @@ const SprintScopingView = ({
         </div>
         <SprintTasksView
           columns={columns}
-          data={sprint.tickets}
+          data={sprint.tickets || []}
           sprint={sprint}
           {...taskViewProps}
         />
@@ -192,7 +192,7 @@ export default function SprintDashboard() {
         });
     }
 
-    const runEffort = processedSprint.tickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
+    const runEffort = (processedSprint.tickets || []).filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
     const runCapacity = processedSprint.runCapacity || 0;
     if (runCapacity > 0 && runEffort > runCapacity) {
          warnings.push({
@@ -213,7 +213,7 @@ export default function SprintDashboard() {
       .slice(-5);
 
     const velocityHistory = velocitySprints.map(s => {
-      const buildTickets = s.tickets.filter(t => t.typeScope === 'Build');
+      const buildTickets = (s.tickets || []).filter(t => t.typeScope === 'Build');
       const completed = buildTickets.filter(t => t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
       const duration = s.sprintDays?.length || 1;
       return duration > 0 ? completed / duration : 0;
@@ -290,7 +290,7 @@ export default function SprintDashboard() {
       creationDate: new Date().toISOString().split('T')[0],
       isOutOfScope,
     };
-    await handleUpdateSprint({ tickets: [...selectedSprint.tickets, newTask] });
+    await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), newTask] });
   };
 
   const handleUpdateTask = async (updatedTask: Ticket) => {
@@ -299,13 +299,13 @@ export default function SprintDashboard() {
     if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
       finalTask.estimation = finalTask.timeLogged;
     }
-    const newTickets = selectedSprint.tickets.map(t => (t.id === finalTask.id) ? finalTask : t);
+    const newTickets = (selectedSprint.tickets || []).map(t => (t.id === finalTask.id) ? finalTask : t);
     await handleUpdateSprint({ tickets: newTickets });
   };
 
   const handleDeleteTask = async (taskId: string) => {
     if (!selectedSprint) return;
-    const newTickets = selectedSprint.tickets.filter(t => t.id !== taskId);
+    const newTickets = (selectedSprint.tickets || []).filter(t => t.id !== taskId);
     await handleUpdateSprint({ tickets: newTickets });
     toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
   };
@@ -829,3 +829,5 @@ export default function SprintDashboard() {
     </div>
   );
 }
+
+    
