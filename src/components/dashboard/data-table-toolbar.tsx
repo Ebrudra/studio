@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { DataTableViewOptions } from "./data-table-view-options"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { statuses, platforms } from "./data"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>,
@@ -16,6 +18,8 @@ interface DataTableToolbarProps<TData> {
   onViewModeChange: (mode: 'list' | 'cards' | 'kanban') => void
   groupBy: 'status' | 'platform' | 'day' | null
   onGroupByChange: (value: 'status' | 'platform' | 'day' | null) => void
+  showInitialScopeOnly: boolean
+  onShowInitialScopeOnlyChange: (value: boolean) => void
 }
 
 export function DataTableToolbar<TData>({
@@ -24,6 +28,8 @@ export function DataTableToolbar<TData>({
   onViewModeChange,
   groupBy,
   onGroupByChange,
+  showInitialScopeOnly,
+  onShowInitialScopeOnlyChange,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
 
@@ -86,6 +92,14 @@ export function DataTableToolbar<TData>({
                 <SelectItem value="day">Group by Day Logged</SelectItem>
             </SelectContent>
         </Select>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="initial-scope"
+            checked={showInitialScopeOnly}
+            onCheckedChange={onShowInitialScopeOnlyChange}
+          />
+          <Label htmlFor="initial-scope">Initial Scope Only</Label>
+        </div>
         {isFiltered && (
         <Button
             variant="ghost"

@@ -58,14 +58,23 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [viewMode, setViewMode] = React.useState<'list' | 'cards' | 'kanban'>('list');
   const [groupBy, setGroupBy] = React.useState<'status' | 'platform' | 'day' | null>(null);
+  const [showInitialScopeOnly, setShowInitialScopeOnly] = React.useState(false);
+
 
   const sprintDayMap = React.useMemo(() => {
     if (!sprint.sprintDays) return new Map<string, number>();
     return new Map(sprint.sprintDays.map((d) => [d.date, d.day]));
   }, [sprint.sprintDays]);
+  
+  const filteredData = React.useMemo(() => {
+    if (showInitialScopeOnly) {
+      return data.filter(task => !task.creationDate || task.creationDate <= sprint.startDate);
+    }
+    return data;
+  }, [data, showInitialScopeOnly, sprint.startDate]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -93,16 +102,16 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
   
-  const filteredTasks = table.getFilteredRowModel().rows.map(row => row.original as Ticket);
+  const allFilteredTasks = table.getCoreRowModel().rows.map(row => row.original as Ticket);
   
   const groupedData = React.useMemo(() => {
     if (!groupBy) return null;
 
     let grouped: Record<string, Row<TData>[]> = {};
-    const filteredRows = table.getFilteredRowModel().rows;
+    const filteredRows = table.getRowModel().rows;
 
     if (groupBy === 'day') {
-        const dayMap = new Map(sprint.sprintDays.map(d => [d.date, `D${d.day} - ${new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`]));
+        const dayMap = new Map((sprint.sprintDays || []).map(d => [d.date, `D${d.day} - ${new Date(d.date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })}`]));
         const unloggedRows = new Set(filteredRows);
 
         filteredRows.forEach(row => {
@@ -305,18 +314,18 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   }
 
   const initialScopeTickets = React.useMemo(() => {
-    return filteredTasks.filter(t => !t.creationDate || t.creationDate <= sprint.startDate);
-  }, [filteredTasks, sprint.startDate]);
+    return data.filter(t => !t.creationDate || t.creationDate <= sprint.startDate);
+  }, [data, sprint.startDate]);
 
   const totalEstimated = React.useMemo(() => {
       return initialScopeTickets.reduce((sum, task) => sum + task.estimation, 0);
   }, [initialScopeTickets]);
 
   const totalLogged = React.useMemo(() => {
-    return filteredTasks
+    return allFilteredTasks
         .filter(t => t.type === 'User story' || t.type === 'Task')
         .reduce((sum, task) => sum + task.timeLogged, 0);
-  }, [filteredTasks]);
+  }, [allFilteredTasks]);
 
   return (
     <div className="space-y-4">
@@ -326,18 +335,20 @@ export function SprintTasksView<TData extends Ticket, TValue>({
         onViewModeChange={setViewMode}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        showInitialScopeOnly={showInitialScopeOnly}
+        onShowInitialScopeOnlyChange={setShowInitialScopeOnly}
       />
       {renderContent()}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
           <div className="text-center p-3 bg-success/10 rounded-lg border">
             <div className="text-2xl font-bold text-success">
-              {filteredTasks.filter((t) => t.status === "Done").length}
+              {allFilteredTasks.filter((t) => t.status === "Done").length}
             </div>
             <div className="text-xs text-muted-foreground">Completed</div>
           </div>
           <div className="text-center p-3 bg-primary/10 rounded-lg border">
             <div className="text-2xl font-bold text-primary">
-              {filteredTasks.filter((t) => t.status === "Doing").length}
+              {allFilteredTasks.filter((t) => t.status === "Doing").length}
             </div>
             <div className="text-xs text-muted-foreground">In Progress</div>
           </div>
