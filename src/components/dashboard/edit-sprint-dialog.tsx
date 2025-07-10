@@ -68,15 +68,11 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
 
   React.useEffect(() => {
     if (sprint) {
-       const personDays: Record<string, number> = sprint.teamPersonDays || {};
-       if (!sprint.teamPersonDays) {
-         const sprintWorkDays = sprint.sprintDays?.length || 0;
-         for (const team of teams) {
-              const buildCapacity = sprint.teamCapacity?.[team.value]?.plannedBuild ?? 0;
-              // Calculate person-days based on build capacity, default to sprint duration if no capacity is set.
-              personDays[team.value] = buildCapacity > 0 ? buildCapacity / 6 : sprintWorkDays;
-          }
-       }
+      // Use saved person days if they exist, otherwise calculate from sprint duration
+      const personDays = sprint.teamPersonDays || teams.reduce((acc, team) => {
+        acc[team.value] = sprint.sprintDays?.length || 0;
+        return acc;
+      }, {} as Record<Team, number>);
 
       reset({
         name: sprint.name,
@@ -101,11 +97,14 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       }))
       replace(newSprintDays);
 
-      teams.forEach((team) => {
-        setValue(`teamPersonDays.${team.value}`, workingDays.length, { shouldValidate: true });
-      });
+      // Only update person-days if they haven't been manually set yet for this sprint
+      if (!sprint.teamPersonDays) {
+        teams.forEach((team) => {
+            setValue(`teamPersonDays.${team.value}`, workingDays.length, { shouldValidate: true });
+        });
+      }
     }
-  }, [startDate, endDate, setValue, replace]);
+  }, [startDate, endDate, setValue, replace, sprint.teamPersonDays]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const teamCapacity: Record<Team, TeamCapacity> = {} as Record<Team, TeamCapacity>;
