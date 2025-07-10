@@ -6,7 +6,7 @@ import { Bar, AreaChart, Area, ComposedChart, Line, LineChart, CartesianGrid, XA
 import { TrendingUp, TrendingDown, Target, Clock, Users, Download } from "lucide-react"
 import html2canvas from "html2canvas"
 
-import type { Sprint, Team, Ticket } from "@/types"
+import type { Sprint, Team, Ticket, TicketStatus } from "@/types"
 import type { DailyProgressData } from "./team-daily-progress"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -48,8 +48,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
 
     const sprintStartDate = sprint.sprintDays[0]?.date
     if (!sprintStartDate) return []
-
-    const calculateInitialScope = (tickets: Ticket[], typeScope: 'total' | 'build' | 'run' | 'out-of-scope') => {
+    
+    const calculateInitialScope = (tickets: Ticket[], typeScope: 'total' | 'build' | 'run' ) => {
         let initialTickets = tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
         if (typeScope === 'build') {
              return initialTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0);
@@ -57,10 +57,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         if (typeScope === 'run') {
             return initialTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
         }
-        if (typeScope === 'total') {
-            return initialTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
-        }
-        return 0; // Out of scope starts at 0
+        // total
+        return initialTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
     }
     
     const initialScope = calculateInitialScope(filteredTickets, 'total');
@@ -176,7 +174,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             } else if (teamPerformanceScope === 'run') {
                 filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Run');
             } else { // total
-                filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
+                filteredTeamTickets = teamTickets.filter(t => ['Build', 'Run'].includes(t.typeScope));
             }
 
             const capacity = sprint.teamCapacity[team.value]

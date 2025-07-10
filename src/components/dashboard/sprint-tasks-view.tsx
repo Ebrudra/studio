@@ -93,13 +93,13 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
   
-  const filteredRows = table.getRowModel().rows;
-  const filteredTasks = filteredRows.map(row => row.original as Ticket);
+  const filteredTasks = table.getFilteredRowModel().rows.map(row => row.original as Ticket);
   
   const groupedData = React.useMemo(() => {
     if (!groupBy) return null;
 
     let grouped: Record<string, Row<TData>[]> = {};
+    const filteredRows = table.getFilteredRowModel().rows;
 
     if (groupBy === 'day') {
         const dayMap = new Map(sprint.sprintDays.map(d => [d.date, `D${d.day} - ${new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`]));
@@ -149,16 +149,16 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     }
 
     return Object.fromEntries(Object.entries(grouped).filter(([, rows]) => rows.length > 0));
-  }, [filteredRows, groupBy, sprint.sprintDays]);
+  }, [table, groupBy, sprint.sprintDays]);
   
   const renderContent = () => {
-    const dataToRender = groupedData ? Object.entries(groupedData) : [['all', filteredRows]];
+    const dataToRender = groupedData ? Object.entries(groupedData) : [['all', table.getRowModel().rows]];
     const isGrouped = !!groupedData;
 
     switch(viewMode) {
       case 'kanban':
         const kanbanColumns = isGrouped ? dataToRender : Object.entries(
-            filteredRows.reduce((acc, row) => {
+            table.getRowModel().rows.reduce((acc, row) => {
                 const status = row.original.status;
                 if (!acc[status]) acc[status] = [];
                 acc[status].push(row);
@@ -268,8 +268,8 @@ export function SprintTasksView<TData extends Ticket, TValue>({
                         </React.Fragment>
                      ))
                   ) : (
-                    filteredRows.length ? (
-                    filteredRows.map((row) => (
+                    table.getRowModel().rows.length ? (
+                    table.getRowModel().rows.map((row) => (
                       <TableRow
                         key={row.id}
                         data-state={row.getIsSelected() && "selected"}
@@ -304,6 +304,20 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     }
   }
 
+  const initialScopeTickets = React.useMemo(() => {
+    return filteredTasks.filter(t => !t.creationDate || t.creationDate <= sprint.startDate);
+  }, [filteredTasks, sprint.startDate]);
+
+  const totalEstimated = React.useMemo(() => {
+      return initialScopeTickets.reduce((sum, task) => sum + task.estimation, 0);
+  }, [initialScopeTickets]);
+
+  const totalLogged = React.useMemo(() => {
+    return filteredTasks
+        .filter(t => t.type === 'User story' || t.type === 'Task')
+        .reduce((sum, task) => sum + task.timeLogged, 0);
+  }, [filteredTasks]);
+
   return (
     <div className="space-y-4">
       <DataTableToolbar 
@@ -329,13 +343,13 @@ export function SprintTasksView<TData extends Ticket, TValue>({
           </div>
           <div className="text-center p-3 bg-warning/10 rounded-lg border">
             <div className="text-2xl font-bold text-warning-foreground">
-              {filteredTasks.reduce((sum, task) => sum + task.estimation, 0).toFixed(1)}h
+              {totalEstimated.toFixed(1)}h
             </div>
             <div className="text-xs text-muted-foreground">Total Estimated</div>
           </div>
           <div className="text-center p-3 bg-muted/50 rounded-lg border">
             <div className="text-2xl font-bold text-foreground">
-              {filteredTasks.reduce((sum, task) => sum + task.timeLogged, 0).toFixed(1)}h
+              {totalLogged.toFixed(1)}h
             </div>
             <div className="text-xs text-muted-foreground">Total Logged</div>
           </div>
