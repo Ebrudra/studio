@@ -35,6 +35,7 @@ import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-up
 import { useToast } from '@/hooks/use-toast';
 import { getSprints, addSprint, updateSprint, deleteSprint, syncSprint } from '@/actions/sprints';
 import { ToastAction } from '../ui/toast';
+import { DataTableToolbar } from './data-table-toolbar';
 
 const SprintScopingView = ({
   sprint,
@@ -422,7 +423,6 @@ export default function SprintDashboard() {
     
     const existingTicketIds = new Set((selectedSprint.tickets || []).map(t => t.id));
     const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
-    const addedCount = uniqueNewTickets.length;
     
     const newTickets: Ticket[] = uniqueNewTickets.map(task => {
         let typeScope: TicketTypeScope = 'Build';
@@ -459,9 +459,6 @@ export default function SprintDashboard() {
 
   const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
     if (!selectedSprint) return;
-    
-    let processedCount = 0;
-    let newTicketsCount = 0;
     
     let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
     const dayToDateMap = new Map<number, string>();
@@ -514,7 +511,6 @@ export default function SprintDashboard() {
           tags: tags,
         };
         newTickets.push(ticket);
-        newTicketsCount++;
       }
 
       if (!ticket.dailyLogs) {
@@ -540,7 +536,6 @@ export default function SprintDashboard() {
         delete ticket.completionDate;
       }
 
-      processedCount++;
     }
     
     newTickets.forEach((ticket: Ticket) => {
@@ -838,43 +833,23 @@ export default function SprintDashboard() {
               </TabsList>
           
               <TabsContent value="tasks" className="mt-4">
-                  <Card>
-                      <CardHeader>
-                          <div className="flex items-center justify-between">
-                              <CardTitle className="flex items-center gap-2">
-                                  Sprint Tasks
-                                  <Badge variant="outline">{(processedSprint.tickets || []).length}</Badge>
-                              </CardTitle>
-
-                              <div className="flex items-center gap-2">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button size="icon" className="rounded-full h-8 w-8">
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onSelect={() => setIsAddTaskOpen(true)} disabled={isSprintCompleted}>
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Add Task
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} disabled={isSprintCompleted}>
-                                            <FileText className="mr-2 h-4 w-4" />
-                                            Log Progress
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => { setUndoState({ tickets: selectedSprint.tickets || [] }); setIsBulkUploadOpen(true); }} disabled={isSprintCompleted}>
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            Bulk Upload
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                              </div>
-                          </div>
-                      </CardHeader>
-                      <CardContent>
-                          <SprintTasksView columns={columns} data={processedSprint.tickets || []} onUpdateTask={handleUpdateTask} onDeleteTask={(taskId) => { if (window.confirm(`Are you sure you want to delete task: ${taskId}? This action cannot be undone.`)) { handleDeleteTask(taskId); } }} onLogTime={handleLogRowAction} sprint={processedSprint} />
-                      </CardContent>
-                  </Card>
+                <SprintTasksView
+                    columns={columns}
+                    data={processedSprint.tickets || []}
+                    sprint={processedSprint}
+                    onUpdateTask={handleUpdateTask}
+                    onDeleteTask={handleDeleteTask}
+                    onLogTime={handleLogRowAction}
+                    onOpenAddTask={() => setIsAddTaskOpen(true)}
+                    onOpenBulkUpload={() => {
+                        setUndoState({ tickets: selectedSprint.tickets || [] });
+                        setIsBulkUploadOpen(true);
+                    }}
+                    onOpenLogProgress={() => {
+                        setTaskToLog(null);
+                        setIsLogProgressOpen(true);
+                    }}
+                />
               </TabsContent>
 
               <TabsContent value="analytics" className="mt-4">
