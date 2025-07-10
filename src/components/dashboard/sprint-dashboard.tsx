@@ -208,7 +208,7 @@ export default function SprintDashboard() {
     const velocityHistory = velocitySprints.map(s => {
       const buildTickets = (s.tickets || []).filter(t => t.typeScope === 'Build');
       const completed = buildTickets.reduce((acc, t) => acc + t.timeLogged, 0);
-      const duration = s.sprintDays?.length || 1;
+      const duration = s.teamPersonDays ? Object.values(s.teamPersonDays).reduce((a, b) => a + b, 0) / Object.keys(s.teamPersonDays).length : s.sprintDays?.length || 1;
       return duration > 0 ? completed / duration : 0;
     });
 
@@ -535,7 +535,7 @@ export default function SprintDashboard() {
   
   const handleClearData = async () => {
     if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
-      await handleUpdateSprint({ tickets: [], reportFilePaths: [] });
+      await handleUpdateSprint({ tickets: [], reportFilePaths: [], isSyncedToFirebase: false });
       toast({ title: "Sprint Data Cleared", description: "All tickets and logs have been removed." });
     }
   };
