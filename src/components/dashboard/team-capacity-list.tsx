@@ -29,7 +29,7 @@ export function TeamCapacityList({ sprint }: TeamCapacityListProps) {
           const plannedBuild = capacity?.plannedBuild ?? 0;
           const plannedRun = capacity?.plannedRun ?? 0;
           
-          const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+          const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.timeLogged, 0)
           const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
           
           const totalPlanned = plannedBuild + plannedRun

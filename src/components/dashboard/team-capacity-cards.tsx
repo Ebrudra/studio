@@ -118,7 +118,6 @@ const TeamCard = ({ teamData }: { teamData: TeamCapacityData }) => {
 
 export function TeamCapacityCards({ sprint }: TeamCapacityCardsProps) {
   const capacityData = useMemo(() => {
-    const teamsInSprint = (Object.keys(sprint.teamCapacity || {}) as Team[]).filter(t => t !== 'Out of Scope');
 
     return allTeams.map(team => {
       const teamTickets = (sprint.tickets || []).filter(t => t.platform === team.value)
@@ -127,7 +126,7 @@ export function TeamCapacityCards({ sprint }: TeamCapacityCardsProps) {
       const plannedBuild = capacity?.plannedBuild ?? 0;
       const plannedRun = capacity?.plannedRun ?? 0;
       
-      const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+      const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.timeLogged, 0)
       const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
       const deliveredBuffer = teamTickets.filter(t => t.typeScope === 'Sprint').reduce((acc, t) => acc + t.timeLogged, 0);
       

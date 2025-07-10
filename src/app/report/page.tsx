@@ -103,10 +103,10 @@ export default function ReportPage() {
 
     // BDC Data Calculation
     const sprintStartDate = sprint.sprintDays[0]?.date
-    const bdcTickets = sprint.tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate)
-    const initialScope = bdcTickets.filter(t => t.typeScope !== 'Sprint').reduce((acc, t) => acc + t.estimation, 0)
-    const initialBuildScope = bdcTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0)
-    const initialRunScope = bdcTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0)
+    const initialTickets = sprint.tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
+    const initialScope = initialTickets.filter(t => t.typeScope !== 'Sprint').reduce((acc, t) => acc + t.estimation, 0)
+    const initialBuildScope = initialTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0)
+    const initialRunScope = initialTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0)
     
     const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; loggedHours: number; loggedBuild: number; loggedRun: number }>()
     sprint.sprintDays.forEach(day => {
@@ -188,7 +188,7 @@ export default function ReportPage() {
       const capacity = sprint.teamCapacity?.[team];
       const plannedBuild = capacity?.plannedBuild ?? 0;
       const plannedRun = capacity?.plannedRun ?? 0;
-      const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+      const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.timeLogged, 0)
       const deliveredRun = teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
       const totalPlanned = plannedBuild + plannedRun
       const totalDelivered = deliveredBuild + deliveredRun

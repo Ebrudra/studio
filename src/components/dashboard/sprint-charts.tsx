@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { Bar, AreaChart, Area, ComposedChart, Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, TrendingDown, Target, Clock, Users, Download, Filter } from "lucide-react"
+import { TrendingUp, TrendingDown, Target, Clock, Users, Download } from "lucide-react"
 import html2canvas from "html2canvas"
 
 import type { Sprint, Team, Ticket } from "@/types"
@@ -49,7 +49,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     if (!sprintStartDate) return []
 
     const calculateInitialScope = (tickets: Ticket[], type: 'total' | 'build' | 'run' | 'sprint') => {
-        let initialTickets = tickets.filter(t => !t.isOutOfScope);
+        let initialTickets = tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
+
         if (type !== 'total') {
             initialTickets = initialTickets.filter(t => t.typeScope.toLowerCase() === type);
         } else {
@@ -71,7 +72,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         const isBuild = ticket.typeScope === 'Build';
         const isRun = ticket.typeScope === 'Run';
         
-        if (ticket.isOutOfScope && ticket.creationDate) {
+        if (ticket.creationDate && ticket.creationDate > sprintStartDate) {
             const delta = dailyDelta.get(ticket.creationDate)
             if (delta) {
                 if(isBuild || isRun) delta.newScope += ticket.estimation
@@ -145,7 +146,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         .map(s => {
             const buildTickets = s.tickets.filter(t => t.typeScope === 'Build');
             const planned = s.buildCapacity || 0;
-            const completed = buildTickets.filter(t => t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
+            const completed = buildTickets.reduce((acc, t) => acc + t.timeLogged, 0);
             const duration = s.sprintDays?.length || 1;
             const velocity = duration > 0 ? completed / duration : 0;
             return { sprint: s.name.split('(')[0].trim(), planned, completed, velocity: parseFloat(velocity.toFixed(1)) };
@@ -154,18 +155,18 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   
   const teamPerformanceData = React.useMemo(() => {
     return allTeams
-        .filter(team => sprint.teamCapacity?.[team as Team] && sprint.teamCapacity[team as Team].plannedBuild > 0)
+        .filter(team => sprint.teamCapacity?.[team.value] && (sprint.teamCapacity[team.value].plannedBuild > 0 || sprint.teamCapacity[team.value].plannedRun > 0))
         .map(team => {
-            const teamTickets = sprint.tickets.filter(t => t.platform === team)
-            const capacity = sprint.teamCapacity[team as Team]
+            const teamTickets = sprint.tickets.filter(t => t.platform === team.value)
+            const capacity = sprint.teamCapacity[team.value]
             
             const planned = capacity.plannedBuild + capacity.plannedRun
-            const completed = teamTickets.filter(t=>t.status==='Done').reduce((acc, t) => acc + t.estimation, 0)
+            const completed = teamTickets.reduce((acc, t) => acc + t.timeLogged, 0)
             const efficiency = planned > 0 ? (completed / planned) * 100 : 0
             const duration = sprint.sprintDays?.length || 1;
             const velocity = duration > 0 ? completed / duration : 0;
             
-            return { team, planned, completed, efficiency: parseFloat(efficiency.toFixed(1)), velocity: parseFloat(velocity.toFixed(1)) }
+            return { team: team.value, planned, completed, efficiency: parseFloat(efficiency.toFixed(1)), velocity: parseFloat(velocity.toFixed(1)) }
         })
   }, [sprint])
   
@@ -174,10 +175,10 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         let record: any = { day: `D${day.day}` };
         let total = 0;
         for(const team of allTeams) {
-            const progress = day.progress[team];
+            const progress = day.progress[team.value];
             if(progress) {
                 const teamTotal = progress.build + progress.run + progress.buffer;
-                record[team.toLowerCase()] = teamTotal;
+                record[team.value.toLowerCase()] = teamTotal;
                 total += teamTotal;
             }
         }
@@ -189,7 +190,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   const distributionData = React.useMemo(() => {
     const workByType: Record<string, number> = { Build: 0, Run: 0, Sprint: 0 }
     const workByTeam: Record<string, number> = {}
-    allTeams.forEach(team => workByTeam[team] = 0);
+    allTeams.forEach(team => workByTeam[team.value] = 0);
 
     sprint.tickets.forEach(ticket => {
         if(ticket.timeLogged > 0) {
@@ -258,7 +259,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     iOS: "hsl(var(--chart-2))",
     Web: "hsl(var(--chart-3))",
     Android: "hsl(var(--chart-4))",
-    Mobile: "hsl(var(--chart-5))",
   };
 
   return (
@@ -271,10 +271,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 <TabsTrigger value="distribution">Distribution</TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled>
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filters
-                </Button>
                 <Button variant="outline" size="sm" onClick={handleExport}>
                   <Download className="w-4 h-4 mr-2" />
                   Export
@@ -374,7 +370,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 <Card>
                 <CardHeader>
                     <CardTitle>Sprint Velocity Trend</CardTitle>
-                    <p className="text-sm text-muted-foreground">Team velocity (completed build work per day) over the last 5 sprints.</p>
+                    <p className="text-sm text-muted-foreground">Team velocity (completed work per day) over the last 5 sprints.</p>
                 </CardHeader>
                 <CardContent>
                     <ChartContainer
@@ -413,7 +409,6 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         ios: { label: "iOS", color: "hsl(var(--chart-2))" },
                         web: { label: "Web", color: "hsl(var(--chart-3))" },
                         android: { label: "Android", color: "hsl(var(--chart-4))" },
-                        mobile: { label: "Mobile", color: "hsl(var(--chart-5))" },
                     }}
                     className="h-[300px]"
                     >

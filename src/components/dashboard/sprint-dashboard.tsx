@@ -124,21 +124,15 @@ export default function SprintDashboard() {
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
-    const sprintTickets = selectedSprint.tickets || [];
-    const tickets = sprintTickets.map(ticket => 
-        (ticket.type === 'Bug' || ticket.type === 'Buffer') ? { ...ticket, estimation: ticket.timeLogged } : ticket
-    );
+    const tickets = selectedSprint.tickets || [];
 
     const buildCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedBuild, 0);
     const runCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedRun, 0);
     const totalCapacity = buildCapacity + runCapacity;
 
-    const bdcTickets = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
-    const totalScope = bdcTickets.reduce((acc, ticket) => acc + ticket.estimation, 0);
+    const totalScope = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, ticket) => acc + ticket.estimation, 0);
 
-    const completedWork = tickets
-      .filter((ticket) => ticket.status === 'Done')
-      .reduce((acc, ticket) => acc + ticket.estimation, 0);
+    const completedWork = tickets.reduce((acc, ticket) => acc + ticket.timeLogged, 0);
 
     const remainingWork = totalScope - completedWork;
     const percentageComplete = totalScope > 0 ? (completedWork / totalScope) * 100 : 0;
@@ -213,7 +207,7 @@ export default function SprintDashboard() {
 
     const velocityHistory = velocitySprints.map(s => {
       const buildTickets = (s.tickets || []).filter(t => t.typeScope === 'Build');
-      const completed = buildTickets.filter(t => t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0);
+      const completed = buildTickets.reduce((acc, t) => acc + t.timeLogged, 0);
       const duration = s.sprintDays?.length || 1;
       return duration > 0 ? completed / duration : 0;
     });
@@ -229,9 +223,8 @@ export default function SprintDashboard() {
         const capacity = processedSprint.teamCapacity?.[team];
         const plannedBuild = capacity?.plannedBuild ?? 0;
         const plannedRun = capacity?.plannedRun ?? 0;
-        const deliveredBuild = teamTickets.filter(t => t.typeScope === 'Build' && t.status === 'Done').reduce((acc, t) => acc + t.estimation, 0)
+        const totalDelivered = teamTickets.reduce((acc, t) => acc + t.timeLogged, 0);
         const totalPlanned = plannedBuild + plannedRun
-        const totalDelivered = deliveredBuild + teamTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.timeLogged, 0);
         return { totalPlanned, totalDelivered };
       });
       
