@@ -93,12 +93,15 @@ export default function SprintDashboard() {
 
   const { toast } = useToast();
   
-  const fetchSprints = useCallback(async () => {
+  const fetchSprints = useCallback(async (sprintToSelectId?: string) => {
     setIsLoading(true);
     try {
         const sprintsFromFs = await getSprints();
         setSprints(sprintsFromFs);
-        if (sprintsFromFs.length > 0 && !selectedSprintId) {
+
+        if (sprintToSelectId) {
+            setSelectedSprintId(sprintToSelectId);
+        } else if (sprintsFromFs.length > 0 && !selectedSprintId) {
             setSelectedSprintId(sprintsFromFs[0].id);
         } else if (sprintsFromFs.length === 0) {
             setSelectedSprintId(undefined);
@@ -126,8 +129,20 @@ export default function SprintDashboard() {
 
     const tickets = selectedSprint.tickets || [];
 
-    const buildCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedBuild, 0);
-    const runCapacity = Object.values(selectedSprint.teamCapacity || {}).reduce((acc, team) => acc + team.plannedRun, 0);
+    // Recalculate capacities to ensure they are always up-to-date with person days
+    const teamCapacity: Record<Team, TeamCapacity> = {} as any;
+    if (selectedSprint.teamPersonDays) {
+      for (const team of platformTeams) {
+        const personDays = selectedSprint.teamPersonDays[team.value] ?? 0;
+        teamCapacity[team.value] = {
+          plannedBuild: personDays * 6,
+          plannedRun: (personDays * 2) - 8,
+        };
+      }
+    }
+    
+    const buildCapacity = Object.values(teamCapacity).reduce((acc, team) => acc + team.plannedBuild, 0);
+    const runCapacity = Object.values(teamCapacity).reduce((acc, team) => acc + team.plannedRun, 0);
     const totalCapacity = buildCapacity + runCapacity;
 
     const totalScope = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, ticket) => acc + ticket.estimation, 0);
@@ -138,7 +153,7 @@ export default function SprintDashboard() {
     const percentageComplete = totalScope > 0 ? (completedWork / totalScope) * 100 : 0;
     const summaryMetrics = { totalScope, completedWork, remainingWork, percentageComplete };
 
-    return { ...selectedSprint, summaryMetrics, tickets, totalCapacity, buildCapacity, runCapacity };
+    return { ...selectedSprint, teamCapacity, summaryMetrics, tickets, totalCapacity, buildCapacity, runCapacity };
   }, [selectedSprint]);
 
   const dailyProgressData = useMemo((): DailyProgressData[] => {
@@ -250,8 +265,7 @@ export default function SprintDashboard() {
   const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
     try {
         const newSprint = await addSprint(newSprintData);
-        await fetchSprints();
-        setSelectedSprintId(newSprint.id);
+        await fetchSprints(newSprint.id);
         toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
@@ -259,12 +273,14 @@ export default function SprintDashboard() {
     }
   };
   
-  const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>) => {
+  const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>, showToast = true) => {
     if (!selectedSprintId) return;
     try {
-        await updateSprint(selectedSprintId, updatedSprintData);
-        await fetchSprints();
-        toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
+        const updatedSprint = await updateSprint(selectedSprintId, updatedSprintData);
+        setSprints(s => s.map(sp => sp.id === selectedSprintId ? updatedSprint : sp));
+        if (showToast) {
+            toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
+        }
     } catch (error) {
         toast({ variant: "destructive", title: "Error", description: "Failed to update sprint." });
         console.error("Error updating sprint:", error);
@@ -418,13 +434,13 @@ export default function SprintDashboard() {
       });
 
     if (newTickets.length > 0) {
-      await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]});
+      await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]}, false);
     }
 
     toast({ 
         title: "Task Upload Complete", 
         description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.`,
-        action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets })}>Undo</ToastAction>
+        action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets }, false)}>Undo</ToastAction>
     });
   };
 
@@ -525,11 +541,11 @@ export default function SprintDashboard() {
         }
     });
 
-    await handleUpdateSprint({ tickets: newTickets });
+    await handleUpdateSprint({ tickets: newTickets }, false);
     toast({
       title: "Progress Log Upload Complete",
       description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
-      action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets })}>Undo</ToastAction>
+      action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets }, false)}>Undo</ToastAction>
     });
   };
   
@@ -551,6 +567,7 @@ export default function SprintDashboard() {
     if (!selectedSprintId || !selectedSprint) return;
     if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
       await deleteSprint(selectedSprintId);
+      setSelectedSprintId(undefined); // Reset selection
       await fetchSprints();
     }
   };
@@ -578,7 +595,7 @@ export default function SprintDashboard() {
     if (!selectedSprintId) return;
     try {
         const syncedSprint = await syncSprint(selectedSprintId);
-        await fetchSprints();
+        await fetchSprints(selectedSprintId);
         toast({ title: "Sprint Synced", description: "Sprint has been backed up to Firebase." });
     } catch (error) {
         console.error("Failed to sync sprint:", error);
