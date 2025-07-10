@@ -23,6 +23,7 @@ export interface Ticket {
   completionDate?: string; // YYYY-MM-DD
   dailyLogs?: DailyLog[];
   isOutOfScope?: boolean;
+  isInitialScope?: boolean;
   assignee?: string;
   tags?: string[];
 }

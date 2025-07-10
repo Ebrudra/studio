@@ -557,7 +557,19 @@ export default function SprintDashboard() {
 
   const handleFinalizeScope = async () => {
     if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
-      await handleUpdateSprint({ status: 'Active' });
+      if (!selectedSprint) return;
+
+      // Create a snapshot of the current tickets and mark them as initial scope
+      const ticketsWithInitialScope = (selectedSprint.tickets || []).map(ticket => ({
+        ...ticket,
+        isInitialScope: true,
+      }));
+
+      await handleUpdateSprint({
+        status: 'Active',
+        tickets: ticketsWithInitialScope,
+      });
+
       toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
     }
   };

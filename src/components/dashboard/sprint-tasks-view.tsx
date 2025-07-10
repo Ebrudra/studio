@@ -68,10 +68,10 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   
   const filteredData = React.useMemo(() => {
     if (showInitialScopeOnly) {
-      return data.filter(task => !task.creationDate || task.creationDate <= sprint.startDate);
+      return data.filter(task => task.isInitialScope);
     }
     return data;
-  }, [data, showInitialScopeOnly, sprint.startDate]);
+  }, [data, showInitialScopeOnly]);
 
   const table = useReactTable({
     data: filteredData,
@@ -313,19 +313,18 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     }
   }
 
-  const initialScopeTickets = React.useMemo(() => {
-    return data.filter(t => !t.creationDate || t.creationDate <= sprint.startDate);
-  }, [data, sprint.startDate]);
+  const { totalEstimated, totalLogged } = React.useMemo(() => {
+    const tasksForStats = table.getFilteredRowModel().rows.map(row => row.original);
+  
+    const initialScopeTickets = data.filter(t => t.isInitialScope);
+    const totalEstimated = initialScopeTickets.reduce((sum, task) => sum + task.estimation, 0);
 
-  const totalEstimated = React.useMemo(() => {
-      return initialScopeTickets.reduce((sum, task) => sum + task.estimation, 0);
-  }, [initialScopeTickets]);
+    const totalLogged = tasksForStats
+      .filter(t => t.type === 'User story' || t.type === 'Task')
+      .reduce((sum, task) => sum + task.timeLogged, 0);
 
-  const totalLogged = React.useMemo(() => {
-    return allFilteredTasks
-        .filter(t => t.type === 'User story' || t.type === 'Task')
-        .reduce((sum, task) => sum + task.timeLogged, 0);
-  }, [allFilteredTasks]);
+    return { totalEstimated, totalLogged };
+  }, [table, data]);
 
   return (
     <div className="space-y-4">
