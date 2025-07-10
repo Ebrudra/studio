@@ -30,6 +30,7 @@ type ScopeFilter = "total" | "build" | "run"
 export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintChartsProps) {
   const [selectedTeam, setSelectedTeam] = React.useState<Team | "all-teams">("all-teams")
   const [burndownType, setBurndownType] = React.useState<ScopeFilter>("total")
+  const [teamPerformanceScope, setTeamPerformanceScope] = React.useState<"total" | "build" | "run">("total");
   const [showProjection, setShowProjection] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState("burndown")
   const today = React.useMemo(() => new Date().toISOString().split('T')[0], [])
@@ -37,7 +38,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
 
   const teamsInSprint = React.useMemo(() => ["all-teams", ...Array.from(new Set(sprint.tickets.map(t => t.platform)))], [sprint.tickets])
 
-  const burndownData = React.useMemo(() => {
+   const burndownData = React.useMemo(() => {
     if (!sprint.sprintDays || sprint.sprintDays.length === 0) return []
 
     let filteredTickets = sprint.tickets
@@ -48,35 +49,40 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     const sprintStartDate = sprint.sprintDays[0]?.date
     if (!sprintStartDate) return []
 
-    const calculateInitialScope = (tickets: Ticket[], type: 'total' | 'build' | 'run' | 'sprint') => {
+    const calculateInitialScope = (tickets: Ticket[], typeScope: 'total' | 'build' | 'run' | 'out-of-scope') => {
         let initialTickets = tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
-
-        if (type !== 'total') {
-            initialTickets = initialTickets.filter(t => t.typeScope.toLowerCase() === type);
-        } else {
-            initialTickets = initialTickets.filter(t => t.typeScope !== 'Sprint');
+        if (typeScope === 'build') {
+             return initialTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0);
         }
-        return initialTickets.reduce((acc, t) => acc + t.estimation, 0);
+        if (typeScope === 'run') {
+            return initialTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
+        }
+        if (typeScope === 'total') {
+            return initialTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
+        }
+        return 0; // Out of scope starts at 0
     }
     
     const initialScope = calculateInitialScope(filteredTickets, 'total');
     const initialBuildScope = calculateInitialScope(filteredTickets, 'build');
     const initialRunScope = calculateInitialScope(filteredTickets, 'run');
     
-    const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; loggedHours: number; loggedBuild: number; loggedRun: number }>()
+    const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; newOutOfScope: number; loggedHours: number; loggedBuild: number; loggedRun: number; loggedOutOfScope: number }>()
     sprint.sprintDays.forEach(day => {
-        dailyDelta.set(day.date, { newScope: 0, newBuildScope: 0, newRunScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0 })
+        dailyDelta.set(day.date, { newScope: 0, newBuildScope: 0, newRunScope: 0, newOutOfScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0, loggedOutOfScope: 0 })
     })
 
     for (const ticket of filteredTickets) {
         const isBuild = ticket.typeScope === 'Build';
         const isRun = ticket.typeScope === 'Run';
+        const isOutOfScope = !!ticket.isOutOfScope;
         
         if (ticket.creationDate && ticket.creationDate > sprintStartDate) {
             const delta = dailyDelta.get(ticket.creationDate)
             if (delta) {
                 if(isBuild || isRun) delta.newScope += ticket.estimation
-                if(isBuild) delta.newBuildScope += ticket.estimation
+                if(isBuild && isOutOfScope) delta.newOutOfScope += ticket.estimation
+                else if (isBuild) delta.newBuildScope += ticket.estimation
                 if(isRun) delta.newRunScope += ticket.estimation
             }
         }
@@ -86,7 +92,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 const delta = dailyDelta.get(log.date)
                 if (delta) {
                     if(isBuild || isRun) delta.loggedHours += log.loggedHours
-                    if(isBuild) delta.loggedBuild += log.loggedHours
+                    if(isBuild && isOutOfScope) delta.loggedOutOfScope += log.loggedHours
+                    else if (isBuild) delta.loggedBuild += log.loggedHours
                     if(isRun) delta.loggedRun += log.loggedHours
                 }
             }
@@ -99,13 +106,15 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
     let remainingActual = initialScope;
     let remainingBuild = initialBuildScope;
     let remainingRun = initialRunScope;
+    let outOfScope = 0;
 
     const dailyData = sprint.sprintDays.map((dayData, index) => {
-        const delta = dailyDelta.get(dayData.date) || { newScope: 0, newBuildScope: 0, newRunScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0 };
+        const delta = dailyDelta.get(dayData.date) || { newScope: 0, newBuildScope: 0, newRunScope: 0, newOutOfScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0, loggedOutOfScope: 0 };
         
         remainingActual += delta.newScope - delta.loggedHours;
         remainingBuild += delta.newBuildScope - delta.loggedBuild;
         remainingRun += delta.newRunScope - delta.loggedRun;
+        outOfScope += delta.newOutOfScope; // Cumulative out of scope
         
         const idealBurn = parseFloat((initialScope - (index + 1) * idealBurnPerDay).toFixed(2));
 
@@ -115,6 +124,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             actual: remainingActual < 0 ? 0 : remainingActual,
             build: remainingBuild < 0 ? 0 : remainingBuild,
             run: remainingRun < 0 ? 0 : remainingRun,
+            outOfScope: outOfScope,
             date: dayData.date
         }
     });
@@ -126,6 +136,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             actual: initialScope,
             build: initialBuildScope,
             run: initialRunScope,
+            outOfScope: 0,
             date: new Date(new Date(sprint.startDate).getTime() - 86400000).toISOString().split('T')[0],
         },
         ...dailyData
@@ -158,10 +169,27 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         .filter(team => sprint.teamCapacity?.[team.value] && (sprint.teamCapacity[team.value].plannedBuild > 0 || sprint.teamCapacity[team.value].plannedRun > 0))
         .map(team => {
             const teamTickets = sprint.tickets.filter(t => t.platform === team.value)
-            const capacity = sprint.teamCapacity[team.value]
             
-            const planned = capacity.plannedBuild + capacity.plannedRun
-            const completed = teamTickets.reduce((acc, t) => acc + t.timeLogged, 0)
+            let filteredTeamTickets = teamTickets;
+            if (teamPerformanceScope === 'build') {
+                filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Build');
+            } else if (teamPerformanceScope === 'run') {
+                filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Run');
+            } else { // total
+                filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run');
+            }
+
+            const capacity = sprint.teamCapacity[team.value]
+            let planned = 0;
+            if (teamPerformanceScope === 'build') {
+                planned = capacity.plannedBuild;
+            } else if (teamPerformanceScope === 'run') {
+                planned = capacity.plannedRun;
+            } else {
+                planned = capacity.plannedBuild + capacity.plannedRun;
+            }
+
+            const completed = filteredTeamTickets.reduce((acc, t) => acc + t.timeLogged, 0)
             const efficiency = planned > 0 ? (completed / planned) * 100 : 0
             
             const personDays = sprint.teamPersonDays?.[team.value] || sprint.sprintDays?.length || 1;
@@ -169,7 +197,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             
             return { team: team.value, planned, completed, efficiency: parseFloat(efficiency.toFixed(1)), velocity: parseFloat(velocity.toFixed(1)) }
         })
-  }, [sprint])
+  }, [sprint, teamPerformanceScope])
   
   const dailyVelocityData = React.useMemo(() => {
     return dailyProgress.map(day => {
@@ -327,14 +355,15 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 <ChartContainer
                     config={{
                     ideal: { label: "Ideal Burn", color: "hsl(var(--muted-foreground))" },
-                    actual: { label: "Actual Burn", color: "hsl(var(--primary))" },
+                    actual: { label: getBurndownName(), color: "hsl(var(--primary))" },
+                    outOfScope: { label: "Out of Scope Added", color: "hsl(var(--chart-4))" },
                     build: { label: "Build Work", color: "hsl(var(--primary))" },
                     run: { label: "Run Work", color: "hsl(var(--chart-2))" },
                     }}
                     className="h-[400px]"
                 >
                     <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={burndownData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <ComposedChart data={burndownData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                         <YAxis
@@ -345,12 +374,13 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Line type="monotone" dataKey="ideal" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} name="Ideal Burn" dot={false} />
                         <Line type="monotone" dataKey={getBurndownKey()} stroke={burndownType === 'run' ? "hsl(var(--chart-2))" : "hsl(var(--primary))"} strokeWidth={3} name={getBurndownName()} activeDot={{ r: 8 }} />
-                    </LineChart>
+                        <Area type="monotone" dataKey="outOfScope" fill="hsl(var(--chart-4))" stroke="hsl(var(--chart-4))" name="Out of Scope Added" fillOpacity={0.3} />
+                    </ComposedChart>
                     </ResponsiveContainer>
                 </ChartContainer>
                 <div className="grid grid-cols-3 gap-4 mt-6">
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold">{sprint.summaryMetrics.remainingWork.toFixed(1)}h</div>
+                    <div className="text-2xl font-bold">{Math.max(0, sprint.summaryMetrics.remainingWork).toFixed(1)}h</div>
                     <div className="text-sm text-muted-foreground">Work Remaining</div>
                     </div>
                     <div className="text-center p-4 bg-primary/10 rounded-lg">
@@ -433,8 +463,26 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             <TabsContent value="teams" className="space-y-4 mt-0">
             <Card>
                 <CardHeader>
-                <CardTitle>Team Performance Analysis</CardTitle>
-                <p className="text-sm text-muted-foreground">Compare each team's completed work against their plan and their efficiency.</p>
+                    <div className="flex items-center justify-between">
+                         <div>
+                            <CardTitle>Team Performance Analysis</CardTitle>
+                            <p className="text-sm text-muted-foreground">Compare each team's completed work against their plan and their efficiency.</p>
+                        </div>
+                        <RadioGroup value={teamPerformanceScope} onValueChange={(v) => setTeamPerformanceScope(v as any)} className="flex items-center gap-4">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="total" id="perf-total" />
+                                <Label htmlFor="perf-total">Total</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="build" id="perf-build" />
+                                <Label htmlFor="perf-build">Build</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="run" id="perf-run" />
+                                <Label htmlFor="perf-run">Run</Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
                 </CardHeader>
                 <CardContent>
                 <ChartContainer
@@ -449,8 +497,8 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                     <ComposedChart data={teamPerformanceData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="team" fontSize={12} />
-                        <YAxis yAxisId="left" fontSize={12} />
-                        <YAxis yAxisId="right" orientation="right" fontSize={12} />
+                        <YAxis yAxisId="left" fontSize={12} label={{ value: "Hours", angle: -90, position: "insideLeft" }}/>
+                        <YAxis yAxisId="right" orientation="right" fontSize={12} label={{ value: "Efficiency %", angle: 90, position: "insideRight" }} />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Bar yAxisId="left" dataKey="planned" fill="var(--color-planned)" name="Planned Hours" />
                         <Bar yAxisId="left" dataKey="completed" fill="var(--color-completed)" name="Completed Hours" />
