@@ -15,7 +15,7 @@ import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket, CloudUpload, Undo } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket, CloudUpload, Undo, Edit } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -411,6 +411,11 @@ export default function SprintDashboard() {
   const handleBulkUpload = (uploadFn: (data: any[]) => void, originalTickets: Ticket[]) => (data: any[]) => {
     setUndoState({ tickets: originalTickets });
     uploadFn(data);
+    toast({
+      title: "Bulk Upload Successful",
+      description: "Data has been imported. You can undo this action.",
+      action: <ToastAction altText="Undo" onClick={handleUndoLastUpload}>Undo</ToastAction>,
+    });
   };
   
   const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
@@ -451,11 +456,6 @@ export default function SprintDashboard() {
     if (newTickets.length > 0) {
       await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]}, false);
     }
-
-    toast({ 
-        title: "Task Upload Complete", 
-        description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.`,
-    });
   };
 
   const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
@@ -554,10 +554,6 @@ export default function SprintDashboard() {
     });
 
     await handleUpdateSprint({ tickets: newTickets }, false);
-    toast({
-      title: "Progress Log Upload Complete",
-      description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
-    });
   };
 
   const handleUndoLastUpload = async () => {
@@ -606,6 +602,13 @@ export default function SprintDashboard() {
       });
 
       toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
+    }
+  };
+
+  const handleEditScope = async () => {
+     if (window.confirm("This will revert the sprint to the 'Scoping' phase, allowing you to change which tasks are part of the initial scope. Continue?")) {
+        await handleUpdateSprint({ status: 'Scoping' });
+        toast({ title: "Sprint reverted to Scoping", description: "You can now edit the initial scope." });
     }
   };
 
@@ -711,6 +714,9 @@ export default function SprintDashboard() {
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => setIsEditSprintOpen(true)} disabled={!selectedSprint}>
                         <Settings className="mr-2 h-4 w-4" /> Edit Sprint Details
+                    </DropdownMenuItem>
+                     <DropdownMenuItem onClick={handleEditScope} disabled={isSprintCompleted || processedSprint.status === 'Scoping'}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit Scope
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleCompleteSprint} disabled={isSprintCompleted}>
                         <Check className="mr-2 h-4 w-4" /> Complete Sprint
