@@ -847,18 +847,27 @@ export default function SprintDashboard() {
                               </CardTitle>
 
                               <div className="flex items-center gap-2">
-                                  <Button onClick={() => { setUndoState({ tickets: selectedSprint.tickets || [] }); setIsBulkUploadOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                      <Upload className="w-4 h-4 mr-2" />
-                                      Bulk Upload
-                                  </Button>
-                                  <Button onClick={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                      <FileText className="w-4 h-4 mr-2" />
-                                      Log Progress
-                                  </Button>
-                                  <Button onClick={() => setIsAddTaskOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
-                                      <Plus className="w-4 h-4 mr-2" />
-                                      Add Task
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="icon" className="rounded-full h-8 w-8">
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => setIsAddTaskOpen(true)} disabled={isSprintCompleted}>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Add Task
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => { setTaskToLog(null); setIsLogProgressOpen(true); }} disabled={isSprintCompleted}>
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            Log Progress
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => { setUndoState({ tickets: selectedSprint.tickets || [] }); setIsBulkUploadOpen(true); }} disabled={isSprintCompleted}>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Bulk Upload
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                               </div>
                           </div>
                       </CardHeader>
