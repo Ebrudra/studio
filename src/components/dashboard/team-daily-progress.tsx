@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Team } from "@/types"
 import { teams as allTeams } from "@/lib/data"
-import { AlertTriangle, TrendingUp, Clock, LayoutGrid, List } from "lucide-react"
+import { AlertTriangle, TrendingUp, Clock, LayoutGrid, List, Download } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +24,7 @@ import {
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
 import { format } from "date-fns"
+import html2canvas from "html2canvas"
 
 export interface DailyProgressData {
   day: number;
@@ -445,17 +446,29 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
 
 export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
   const [viewMode, setViewMode] = React.useState<'list' | 'grid'>('list');
+  const exportRef = React.useRef<HTMLDivElement>(null);
   
   const hasProgress = dailyProgress && dailyProgress.some(d => {
     return Object.values(d.progress).some(p => p.build > 0 || p.run > 0 || p.buffer > 0);
   });
   
+  const handleExport = () => {
+    if (exportRef.current) {
+        html2canvas(exportRef.current, { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'daily-progress.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+  };
+
   if (!hasProgress) {
       return null;
   }
 
   return (
-    <Card>
+    <Card ref={exportRef}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -467,6 +480,10 @@ export function TeamDailyProgress({ dailyProgress }: TeamDailyProgressProps) {
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="w-4 h-4 mr-2" />
+                Export
+            </Button>
             <Button
                 onClick={() => setViewMode('list')}
                 variant={viewMode === 'list' ? 'default' : 'secondary'}
