@@ -59,8 +59,8 @@ const SprintScopingView = ({
       <CardHeader>
         <CardTitle>Define Initial Scope for "{sprint.name}"</CardTitle>
         <CardDescription>
-          Add all the initial 'Build' tickets for this sprint. You can add them manually or upload a CSV file.
-          Any 'Build' tickets added after finalizing the scope will be marked as 'Out of Scope'.
+          Add all the initial 'Build' and 'Run' tickets for this sprint. You can add them manually or upload a CSV file.
+          'Build' tickets added after finalizing the scope will be marked as 'Out of Scope'.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -152,9 +152,9 @@ export default function SprintDashboard() {
     const buildCapacity = Object.values(teamCapacity).reduce((acc, team) => acc + team.plannedBuild, 0);
     const runCapacity = Object.values(teamCapacity).reduce((acc, team) => acc + team.plannedRun, 0);
     const totalCapacity = buildCapacity + runCapacity;
-
+    
     const totalScope = tickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, ticket) => acc + ticket.estimation, 0);
-
+    
     const completedWork = tickets.reduce((acc, ticket) => acc + ticket.timeLogged, 0);
 
     const remainingWork = totalScope - completedWork;
@@ -229,10 +229,9 @@ export default function SprintDashboard() {
       .slice(-5);
 
     const velocityHistory = velocitySprints.map(s => {
-      const buildTickets = (s.tickets || []).filter(t => t.typeScope === 'Build');
-      const completed = buildTickets.reduce((acc, t) => acc + t.timeLogged, 0);
-      const duration = s.teamPersonDays ? Object.values(s.teamPersonDays).reduce((a, b) => a + b, 0) / Object.keys(s.teamPersonDays).length : s.sprintDays?.length || 1;
-      return duration > 0 ? completed / duration : 0;
+      const completedWork = (s.tickets || []).reduce((acc, t) => acc + t.timeLogged, 0);
+      const personDays = s.teamPersonDays ? Object.values(s.teamPersonDays).reduce((a, b) => a + b, 0) / (Object.keys(s.teamPersonDays).length || 1) : s.sprintDays?.length || 1;
+      return personDays > 0 ? completedWork / personDays : 0;
     });
 
     const currentVelocity = velocityHistory.length > 0 ? velocityHistory[velocityHistory.length - 1] : 0;

@@ -102,7 +102,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
   
-  const allFilteredTasks = table.getCoreRowModel().rows.map(row => row.original as Ticket);
+  const allFilteredTasks = table.getFilteredRowModel().rows.map(row => row.original as Ticket);
   
   const groupedData = React.useMemo(() => {
     if (!groupBy) return null;
@@ -314,7 +314,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   }
 
   const { totalEstimated, totalLogged } = React.useMemo(() => {
-    const tasksForStats = table.getFilteredRowModel().rows.map(row => row.original);
+    const tasksForStats = allFilteredTasks;
   
     const initialScopeTickets = data.filter(t => t.isInitialScope);
     const totalEstimated = initialScopeTickets.reduce((sum, task) => sum + task.estimation, 0);
@@ -324,7 +324,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
       .reduce((sum, task) => sum + task.timeLogged, 0);
 
     return { totalEstimated, totalLogged };
-  }, [table, data]);
+  }, [allFilteredTasks, data]);
 
   return (
     <div className="space-y-4">

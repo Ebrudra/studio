@@ -39,99 +39,79 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
   const teamsInSprint = React.useMemo(() => ["all-teams", ...Array.from(new Set(sprint.tickets.map(t => t.platform)))], [sprint.tickets])
 
    const burndownData = React.useMemo(() => {
-    if (!sprint.sprintDays || sprint.sprintDays.length === 0) return []
+    if (!sprint.sprintDays || sprint.sprintDays.length === 0) return [];
 
-    let filteredTickets = sprint.tickets
+    let filteredTickets = sprint.tickets;
     if (selectedTeam !== "all-teams") {
-      filteredTickets = filteredTickets.filter(t => t.platform === selectedTeam)
+      filteredTickets = filteredTickets.filter(t => t.platform === selectedTeam);
     }
+    
+    // --- Step 1: Calculate Initial Scope based on the isInitialScope flag ---
+    const initialScopeTickets = filteredTickets.filter(t => t.isInitialScope);
+    const initialBuildScope = initialScopeTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0);
+    const initialRunScope = initialScopeTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
+    const initialTotalScope = initialBuildScope + initialRunScope;
 
-    const sprintStartDate = sprint.sprintDays[0]?.date
-    if (!sprintStartDate) return []
-    
-    const calculateInitialScope = (tickets: Ticket[], typeScope: 'total' | 'build' | 'run' ) => {
-        let initialTickets = tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
-        if (typeScope === 'build') {
-             return initialTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0);
-        }
-        if (typeScope === 'run') {
-            return initialTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
-        }
-        // total
-        return initialTickets.filter(t => t.typeScope === 'Build' || t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0);
-    }
-    
-    const initialScope = calculateInitialScope(filteredTickets, 'total');
-    const initialBuildScope = calculateInitialScope(filteredTickets, 'build');
-    const initialRunScope = calculateInitialScope(filteredTickets, 'run');
-    
-    const dailyDelta = new Map<string, { newScope: number; newBuildScope: number; newRunScope: number; newOutOfScope: number; loggedHours: number; loggedBuild: number; loggedRun: number; loggedOutOfScope: number }>()
+    // --- Step 2: Pre-calculate daily logs and scope changes ---
+    const dailyDelta = new Map<string, { newBuildScope: number; newRunScope: number; loggedBuild: number; loggedRun: number }>();
     sprint.sprintDays.forEach(day => {
-        dailyDelta.set(day.date, { newScope: 0, newBuildScope: 0, newRunScope: 0, newOutOfScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0, loggedOutOfScope: 0 })
-    })
+        dailyDelta.set(day.date, { newBuildScope: 0, newRunScope: 0, loggedBuild: 0, loggedRun: 0 });
+    });
 
     for (const ticket of filteredTickets) {
-        const isBuild = ticket.typeScope === 'Build';
-        const isRun = ticket.typeScope === 'Run';
-        const isOutOfScope = !!ticket.isOutOfScope;
-        
-        if (ticket.creationDate && ticket.creationDate > sprintStartDate) {
-            const delta = dailyDelta.get(ticket.creationDate)
+        // New scope added on its creation date
+        if (!ticket.isInitialScope && ticket.creationDate) {
+            const delta = dailyDelta.get(ticket.creationDate);
             if (delta) {
-                if(isBuild || isRun) delta.newScope += ticket.estimation
-                if(isBuild && isOutOfScope) delta.newOutOfScope += ticket.estimation
-                else if (isBuild) delta.newBuildScope += ticket.estimation
-                if(isRun) delta.newRunScope += ticket.estimation
+                if (ticket.typeScope === 'Build') delta.newBuildScope += ticket.estimation;
+                if (ticket.typeScope === 'Run') delta.newRunScope += ticket.estimation;
             }
         }
-
+        // Logged hours on the date they were logged
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
-                const delta = dailyDelta.get(log.date)
+                const delta = dailyDelta.get(log.date);
                 if (delta) {
-                    if(isBuild || isRun) delta.loggedHours += log.loggedHours
-                    if(isBuild && isOutOfScope) delta.loggedOutOfScope += log.loggedHours
-                    else if (isBuild) delta.loggedBuild += log.loggedHours
-                    if(isRun) delta.loggedRun += log.loggedHours
+                    if (ticket.typeScope === 'Build') delta.loggedBuild += log.loggedHours;
+                    if (ticket.typeScope === 'Run') delta.loggedRun += log.loggedHours;
                 }
             }
         }
     }
 
-    const sprintDurationInDays = sprint.sprintDays.length
-    const idealBurnPerDay = sprintDurationInDays > 0 ? initialScope / sprintDurationInDays : 0
-
-    let remainingActual = initialScope;
+    // --- Step 3: Iterate through sprint days to build the chart data ---
     let remainingBuild = initialBuildScope;
     let remainingRun = initialRunScope;
     let outOfScope = 0;
 
+    const sprintDurationInDays = sprint.sprintDays.length;
+    const idealBurnPerDay = sprintDurationInDays > 0 ? initialTotalScope / sprintDurationInDays : 0;
+
     const dailyData = sprint.sprintDays.map((dayData, index) => {
-        const delta = dailyDelta.get(dayData.date) || { newScope: 0, newBuildScope: 0, newRunScope: 0, newOutOfScope: 0, loggedHours: 0, loggedBuild: 0, loggedRun: 0, loggedOutOfScope: 0 };
+        const delta = dailyDelta.get(dayData.date) || { newBuildScope: 0, newRunScope: 0, loggedBuild: 0, loggedRun: 0 };
         
-        remainingActual += delta.newScope - delta.loggedHours;
         remainingBuild += delta.newBuildScope - delta.loggedBuild;
         remainingRun += delta.newRunScope - delta.loggedRun;
-        outOfScope += delta.newOutOfScope; // Cumulative out of scope
+        outOfScope += delta.newBuildScope;
         
-        const idealBurn = parseFloat((initialScope - (index + 1) * idealBurnPerDay).toFixed(2));
+        const idealBurn = parseFloat((initialTotalScope - (index + 1) * idealBurnPerDay).toFixed(2));
 
         return {
             day: `Day ${dayData.day}`,
             ideal: idealBurn < 0 ? 0 : idealBurn,
-            actual: remainingActual < 0 ? 0 : remainingActual,
+            actual: (remainingBuild + remainingRun) < 0 ? 0 : (remainingBuild + remainingRun),
             build: remainingBuild < 0 ? 0 : remainingBuild,
             run: remainingRun < 0 ? 0 : remainingRun,
             outOfScope: outOfScope,
             date: dayData.date
         }
     });
-
+    
     const processedData = [
         {
             day: 'Day 0',
-            ideal: initialScope,
-            actual: initialScope,
+            ideal: initialTotalScope,
+            actual: initialTotalScope,
             build: initialBuildScope,
             run: initialRunScope,
             outOfScope: 0,
@@ -153,14 +133,13 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
         .sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
         .slice(-5) // last 5 sprints
         .map(s => {
-            const buildTickets = s.tickets.filter(t => t.typeScope === 'Build');
-            const planned = s.buildCapacity || 0;
-            const completed = buildTickets.reduce((acc, t) => acc + t.timeLogged, 0);
-            const duration = s.sprintDays?.length || 1;
-            const velocity = duration > 0 ? completed / duration : 0;
-            return { sprint: s.name.split('(')[0].trim(), planned, completed, velocity: parseFloat(velocity.toFixed(1)) };
+            const completedWork = s.tickets.reduce((acc, t) => acc + t.timeLogged, 0);
+            const personDays = s.teamPersonDays ? Object.values(s.teamPersonDays).reduce((a, b) => a + b, 0) : s.sprintDays?.length || 1;
+            const velocity = personDays > 0 ? completedWork / personDays : 0;
+            const buildCapacity = s.buildCapacity || 0;
+            return { sprint: s.name.split('(')[0].trim(), planned: buildCapacity, completed: completedWork, velocity: parseFloat(velocity.toFixed(1)) };
         });
-  }, [allSprints, sprint.id]);
+  }, [allSprints, sprint]);
   
   const teamPerformanceData = React.useMemo(() => {
     return allTeams
@@ -169,7 +148,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             const teamTickets = sprint.tickets.filter(t => t.platform === team.value)
             
             let filteredTeamTickets = teamTickets;
-            if (teamPerformanceScope === 'build') {
+             if (teamPerformanceScope === 'build') {
                 filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Build');
             } else if (teamPerformanceScope === 'run') {
                 filteredTeamTickets = teamTickets.filter(t => t.typeScope === 'Run');
@@ -399,13 +378,13 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                 <Card>
                 <CardHeader>
                     <CardTitle>Sprint Velocity Trend</CardTitle>
-                    <p className="text-sm text-muted-foreground">Team velocity (completed work per day) over the last 5 sprints.</p>
+                    <p className="text-sm text-muted-foreground">Team velocity (completed work per person-day) over the last 5 sprints.</p>
                 </CardHeader>
                 <CardContent>
                     <ChartContainer
                     config={{
-                        planned: { label: "Planned", color: "hsl(var(--secondary))" },
-                        completed: { label: "Completed", color: "hsl(var(--primary))" },
+                        planned: { label: "Planned Build", color: "hsl(var(--secondary))" },
+                        completed: { label: "Total Completed", color: "hsl(var(--primary))" },
                         velocity: { label: "Velocity", color: "hsl(var(--success))" },
                     }}
                     className="h-[300px]"
@@ -417,9 +396,9 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         <YAxis yAxisId="left" fontSize={12} />
                         <YAxis yAxisId="right" orientation="right" fontSize={12} />
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar yAxisId="left" dataKey="planned" fill="var(--color-planned)" name="Planned" />
-                        <Bar yAxisId="left" dataKey="completed" fill="var(--color-completed)" name="Completed" />
-                        <Line yAxisId="right" type="monotone" dataKey="velocity" stroke="var(--color-velocity)" strokeWidth={3} name="Velocity" dot={false} />
+                        <Bar yAxisId="left" dataKey="planned" fill="var(--color-planned)" name="Planned Build" />
+                        <Bar yAxisId="left" dataKey="completed" fill="var(--color-completed)" name="Total Completed" />
+                        <Line yAxisId="right" type="monotone" dataKey="velocity" stroke="var(--color-velocity)" strokeWidth={3} name="Velocity (h/day)" dot={false} />
                         </ComposedChart>
                     </ResponsiveContainer>
                     </ChartContainer>
