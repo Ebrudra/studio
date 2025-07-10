@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Team } from "@/types"
 import { teams as allTeams } from "@/lib/data"
-import { AlertTriangle, TrendingUp, Clock, LayoutGrid, List, Download } from "lucide-react"
+import { AlertTriangle, TrendingUp, Clock, LayoutGrid, List, Download, ChevronDown, ChevronUp } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -193,6 +193,8 @@ const TeamDailyProgressList = ({ dailyProgress }: TeamDailyProgressProps) => {
 
 // Internal component for the Grid View
 const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
+    const [showDetails, setShowDetails] = React.useState(false);
+
     const activeTeams = React.useMemo(() => {
         const teamSet = new Set<Team>();
         dailyProgress.forEach(day => {
@@ -352,7 +354,7 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     const TotalSummaryCard = () => {
         const { teams: teamTotals, dailyTotals } = totalSummary;
         return (
-            <Card className="border-2 border-blue-200 bg-blue-50">
+            <Card className="border-2 border-blue-200 bg-blue-50 col-span-1 lg:col-span-2 xl:col-span-3">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -385,13 +387,20 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-blue-700">Team Totals</div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {activeTeams.map(team => {
                          const teamData = teamTotals[team.value];
                          if (!teamData || teamData.total === 0) return null;
                          return <TeamProgressCard key={team.value} team={team.value} teamName={team.label} data={{...teamData, warning: false}}/>
                     })}
                   </div>
+                </div>
+
+                <div className="pt-2 border-t">
+                    <Button variant="ghost" onClick={() => setShowDetails(!showDetails)} className="w-full">
+                        {showDetails ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+                        {showDetails ? "Hide Daily Details" : "Show Daily Details"}
+                    </Button>
                 </div>
               </CardContent>
             </Card>
@@ -403,28 +412,11 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
         return total > 0;
     });
 
-    const totalHours = totalSummary.dailyTotals.total;
-    const avgHoursPerDay = activeDays.length > 0 ? totalHours / activeDays.length : 0;
-    const daysWithWarnings = activeDays.filter(day => 
-        activeTeams.some(team => {
-            const p = day.progress[team.value];
-            const total = p.build + p.run + p.buffer;
-            return total > 0 && total < 8;
-        })
-    ).length;
-
     return (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2"><Clock className="w-4 h-4 text-blue-500" /><div><div className="text-2xl font-bold">{totalHours.toFixed(1)}h</div><div className="text-xs text-gray-500">Total Hours</div></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /><div><div className="text-2xl font-bold">{avgHoursPerDay.toFixed(1)}h</div><div className="text-xs text-gray-500">Avg per Day</div></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-orange-500" /><div><div className="text-2xl font-bold">{daysWithWarnings}</div><div className="text-xs text-gray-500">Days with Issues</div></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2"><div className="w-4 h-4 bg-primary rounded"></div><div><div className="text-2xl font-bold">{activeDays.length}</div><div className="text-xs text-gray-500">Active Days</div></div></div></CardContent></Card>
-          </div>
-    
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             <TotalSummaryCard />
-            {activeDays.map((dayData) => (
+            {showDetails && activeDays.map((dayData) => (
               <DayCard key={dayData.day} dayData={dayData} />
             ))}
           </div>
