@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { statuses, platforms } from "./data"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { AnimatePresence, motion } from "framer-motion"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>,
@@ -74,15 +73,8 @@ export function DataTableToolbar<TData>({
         <DataTableViewOptions table={table} viewMode={viewMode} onViewModeChange={onViewModeChange} />
       </div>
 
-       <AnimatePresence>
         {filtersVisible && (
-            <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-            >
+            <div className="overflow-hidden">
                 <div className="flex items-center space-x-2 pb-2">
                      <Select
                         value={(table.getColumn("status")?.getFilterValue() as string) ?? "all"}
@@ -132,9 +124,8 @@ export function DataTableToolbar<TData>({
                     <Label htmlFor="initial-scope">Initial Scope Only</Label>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         )}
-       </AnimatePresence>
     </div>
   )
 }
