@@ -163,8 +163,9 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
             const planned = capacity.plannedBuild + capacity.plannedRun
             const completed = teamTickets.reduce((acc, t) => acc + t.timeLogged, 0)
             const efficiency = planned > 0 ? (completed / planned) * 100 : 0
-            const duration = sprint.sprintDays?.length || 1;
-            const velocity = duration > 0 ? completed / duration : 0;
+            
+            const personDays = sprint.teamPersonDays?.[team.value] || sprint.sprintDays?.length || 1;
+            const velocity = personDays > 0 ? completed / personDays : 0;
             
             return { team: team.value, planned, completed, efficiency: parseFloat(efficiency.toFixed(1)), velocity: parseFloat(velocity.toFixed(1)) }
         })
@@ -464,7 +465,7 @@ export function SprintCharts({ sprint, allSprints, dailyProgress }: SprintCharts
                         <div className="text-2xl font-bold mt-1">{teamData.efficiency.toFixed(0)}%</div>
                         <div className="text-xs text-muted-foreground">Efficiency</div>
                         <Badge variant="outline" className="mt-2 font-normal">
-                        {teamData.velocity}h/day
+                        {teamData.velocity.toFixed(1)}h/day
                         </Badge>
                     </div>
                     ))}

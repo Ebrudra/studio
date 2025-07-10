@@ -46,7 +46,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       name: "",
       startDate: undefined,
       endDate: undefined,
-      teamPersonDays: teams.reduce((acc, team) => ({ ...acc, [team]: 0 }), {} as Record<Team, number>),
+      teamPersonDays: teams.reduce((acc, team) => ({ ...acc, [team.value]: 0 }), {} as Record<Team, number>),
     },
   })
   
@@ -79,7 +79,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       ).length;
 
       teams.forEach((team) => {
-        setValue(`teamPersonDays.${team}`, weekDays, { shouldValidate: true });
+        setValue(`teamPersonDays.${team.value}`, weekDays, { shouldValidate: true });
       });
     }
   }, [startDate, endDate, setValue, trigger]);
@@ -89,20 +89,20 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
     let hasInvalidCapacity = false;
 
     teams.forEach(team => {
-      const personDays = values.teamPersonDays[team as Team];
+      const personDays = values.teamPersonDays[team.value as Team];
       const plannedBuild = personDays * 6;
       const plannedRun = (personDays * 2) - 8; 
 
       if (plannedRun < 0) {
         toast({
             variant: "destructive",
-            title: `Invalid Capacity for ${team}`,
-            description: `Run capacity for ${team} is negative (${plannedRun}h). Please adjust person-days.`
+            title: `Invalid Capacity for ${team.value}`,
+            description: `Run capacity for ${team.value} is negative (${plannedRun}h). Please adjust person-days.`
         });
         hasInvalidCapacity = true;
       }
 
-      teamCapacity[team as Team] = { plannedBuild, plannedRun };
+      teamCapacity[team.value as Team] = { plannedBuild, plannedRun };
     });
     
     if (hasInvalidCapacity) {
@@ -130,6 +130,7 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
       sprintDays,
       status: 'Scoping',
       teamCapacity: teamCapacity,
+      teamPersonDays: values.teamPersonDays,
       totalCapacity: totalBuild + totalRun,
       buildCapacity: totalBuild,
       runCapacity: totalRun,
@@ -192,12 +193,12 @@ export function NewSprintDialog({ isOpen, setIsOpen, onCreateSprint }: NewSprint
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {teams.map(team => (
                   <FormField
-                    key={team}
+                    key={team.value}
                     control={form.control}
-                    name={`teamPersonDays.${team}`}
+                    name={`teamPersonDays.${team.value}`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{team}</FormLabel>
+                        <FormLabel>{team.label}</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>

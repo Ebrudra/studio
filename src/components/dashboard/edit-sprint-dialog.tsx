@@ -27,7 +27,7 @@ interface EditSprintDialogProps {
   isOpen: boolean
   setIsOpen: (isOpen: boolean) => void
   sprint: Sprint;
-  onUpdateSprint: (sprint: Sprint) => void
+  onUpdateSprint: (sprintData: Partial<Omit<Sprint, 'id'>>) => void
 }
 
 const formSchema = z.object({
@@ -56,7 +56,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       startDate: new Date(sprint.startDate),
       endDate: new Date(sprint.endDate),
       sprintDays: (sprint.sprintDays || []).map(d => ({ ...d, date: new Date(d.date) })),
-      teamPersonDays: {},
+      teamPersonDays: sprint.teamPersonDays || {},
     },
   });
   
@@ -68,13 +68,15 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
 
   React.useEffect(() => {
     if (sprint) {
-       const personDays: Record<string, number> = {};
-       const sprintWorkDays = sprint.sprintDays?.length || 0;
-       for (const team of teams) {
-            const buildCapacity = sprint.teamCapacity?.[team]?.plannedBuild ?? 0;
-            // Calculate person-days based on build capacity, default to sprint duration if no capacity is set.
-            personDays[team] = buildCapacity > 0 ? buildCapacity / 6 : sprintWorkDays;
-        }
+       const personDays: Record<string, number> = sprint.teamPersonDays || {};
+       if (!sprint.teamPersonDays) {
+         const sprintWorkDays = sprint.sprintDays?.length || 0;
+         for (const team of teams) {
+              const buildCapacity = sprint.teamCapacity?.[team.value]?.plannedBuild ?? 0;
+              // Calculate person-days based on build capacity, default to sprint duration if no capacity is set.
+              personDays[team.value] = buildCapacity > 0 ? buildCapacity / 6 : sprintWorkDays;
+          }
+       }
 
       reset({
         name: sprint.name,
@@ -100,7 +102,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       replace(newSprintDays);
 
       teams.forEach((team) => {
-        setValue(`teamPersonDays.${team}`, workingDays.length, { shouldValidate: true });
+        setValue(`teamPersonDays.${team.value}`, workingDays.length, { shouldValidate: true });
       });
     }
   }, [startDate, endDate, setValue, replace]);
@@ -110,20 +112,20 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
     let hasInvalidCapacity = false;
 
     teams.forEach(team => {
-      const personDays = values.teamPersonDays[team as Team];
+      const personDays = values.teamPersonDays[team.value as Team];
       const plannedBuild = personDays * 6;
       const plannedRun = (personDays * 2) - 8; 
 
       if (plannedRun < 0) {
         toast({
             variant: "destructive",
-            title: `Invalid Capacity for ${team}`,
-            description: `Run capacity for ${team} is negative (${plannedRun}h). Please adjust person-days.`
+            title: `Invalid Capacity for ${team.value}`,
+            description: `Run capacity for ${team.value} is negative (${plannedRun}h). Please adjust person-days.`
         });
         hasInvalidCapacity = true;
       }
 
-      teamCapacity[team as Team] = { plannedBuild, plannedRun };
+      teamCapacity[team.value as Team] = { plannedBuild, plannedRun };
     });
     
     if (hasInvalidCapacity) {
@@ -145,6 +147,7 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
       endDate: values.endDate.toISOString(),
       sprintDays: formattedSprintDays,
       teamCapacity: teamCapacity,
+      teamPersonDays: values.teamPersonDays,
       totalCapacity: totalBuild + totalRun,
       buildCapacity: totalBuild,
       runCapacity: totalRun,
@@ -208,12 +211,12 @@ export function EditSprintDialog({ isOpen, setIsOpen, sprint, onUpdateSprint }: 
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {teams.map(team => (
                             <FormField
-                                key={team}
+                                key={team.value}
                                 control={control}
-                                name={`teamPersonDays.${team}`}
+                                name={`teamPersonDays.${team.value}`}
                                 render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>{team}</FormLabel>
+                                    <FormLabel>{team.label}</FormLabel>
                                     <FormControl>
                                     <Input type="number" {...field} />
                                     </FormControl>

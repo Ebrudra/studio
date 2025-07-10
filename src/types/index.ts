@@ -47,6 +47,7 @@ export interface Sprint {
   sprintDays: SprintDay[];
   lastUpdatedAt: string;
   teamCapacity: Record<Team, TeamCapacity>;
+  teamPersonDays?: Record<Team, number>;
   totalCapacity?: number;
   buildCapacity?: number;
   runCapacity?: number;
