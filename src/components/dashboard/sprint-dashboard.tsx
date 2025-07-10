@@ -15,7 +15,7 @@ import { SprintCharts } from './sprint-charts';
 import { TeamCapacityTable } from './team-capacity-table';
 import { TeamDailyProgress, type DailyProgressData } from './team-daily-progress';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket, CloudUpload } from 'lucide-react';
+import { CheckCircle, GitCommitHorizontal, ListTodo, Plus, BarChart3, Zap, Upload, AlertCircle, History, Trash2, Check, Settings, FileArchive, FileText, TrendingUp, TrendingDown, Target, Clock, Users, Rocket, CloudUpload, Undo } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -41,12 +41,16 @@ const SprintScopingView = ({
   onFinalizeScope,
   onOpenAddTask,
   onOpenBulkUpload,
+  onUndoLastUpload,
+  canUndo,
   ...taskViewProps
 }: {
   sprint: Sprint;
   onFinalizeScope: () => void;
   onOpenAddTask: () => void;
   onOpenBulkUpload: () => void;
+  onUndoLastUpload: () => void;
+  canUndo: boolean;
   onUpdateTask: (task: Ticket) => void;
   onDeleteTask: (taskId: string) => void;
   onLogTime: (task: Ticket) => void;
@@ -61,6 +65,9 @@ const SprintScopingView = ({
       </CardHeader>
       <CardContent>
         <div className="flex justify-end gap-2 mb-4">
+          <Button onClick={onUndoLastUpload} variant="outline" disabled={!canUndo}>
+            <Undo className="mr-2 h-4 w-4" /> Undo Last Upload
+          </Button>
           <Button onClick={onOpenBulkUpload} variant="outline"><Upload className="mr-2 h-4 w-4" /> Bulk Upload Tasks</Button>
           <Button onClick={onOpenAddTask} variant="outline"><Plus className="mr-2 h-4 w-4" /> Add Task Manually</Button>
         </div>
@@ -90,6 +97,7 @@ export default function SprintDashboard() {
   const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
   const [taskToLog, setTaskToLog] = useState<Ticket | null>(null);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [undoState, setUndoState] = useState<{ tickets: Ticket[] } | null>(null);
 
   const { toast } = useToast();
   
@@ -298,6 +306,7 @@ export default function SprintDashboard() {
       creationDate: new Date().toISOString().split('T')[0],
       isOutOfScope,
     };
+    setUndoState(null); // Invalidate undo state on manual change
     await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), newTask] });
   };
 
@@ -308,12 +317,14 @@ export default function SprintDashboard() {
       finalTask.estimation = finalTask.timeLogged;
     }
     const newTickets = (selectedSprint.tickets || []).map(t => (t.id === finalTask.id) ? finalTask : t);
+    setUndoState(null); // Invalidate undo state on manual change
     await handleUpdateSprint({ tickets: newTickets });
   };
 
   const handleDeleteTask = async (taskId: string) => {
     if (!selectedSprint) return;
     const newTickets = (selectedSprint.tickets || []).filter(t => t.id !== taskId);
+    setUndoState(null); // Invalidate undo state on manual change
     await handleUpdateSprint({ tickets: newTickets });
     toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
   };
@@ -393,13 +404,17 @@ export default function SprintDashboard() {
         delete ticket.completionDate;
       }
     }
+    setUndoState(null); // Invalidate undo state on manual change
     await handleUpdateSprint({ tickets: newTickets });
+  };
+  
+  const handleBulkUpload = (uploadFn: (data: any[]) => void, originalTickets: Ticket[]) => (data: any[]) => {
+    setUndoState({ tickets: originalTickets });
+    uploadFn(data);
   };
   
   const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
     if (!selectedSprint) return;
-    
-    const originalTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
     
     const existingTicketIds = new Set((selectedSprint.tickets || []).map(t => t.id));
     const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
@@ -440,14 +455,11 @@ export default function SprintDashboard() {
     toast({ 
         title: "Task Upload Complete", 
         description: `${addedCount} tasks added. ${tasks.length - addedCount} duplicates skipped.`,
-        action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets }, false)}>Undo</ToastAction>
     });
   };
 
   const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
     if (!selectedSprint) return;
-
-    const originalTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
     
     let processedCount = 0;
     let newTicketsCount = 0;
@@ -545,8 +557,14 @@ export default function SprintDashboard() {
     toast({
       title: "Progress Log Upload Complete",
       description: `${processedCount} logs processed. ${newTicketsCount} new tickets were created.`,
-      action: <ToastAction altText="Undo" onClick={() => handleUpdateSprint({ tickets: originalTickets }, false)}>Undo</ToastAction>
     });
+  };
+
+  const handleUndoLastUpload = async () => {
+    if (!undoState) return;
+    await handleUpdateSprint({ tickets: undoState.tickets }, false);
+    toast({ title: "Undo Successful", description: "Reverted to the state before the last upload." });
+    setUndoState(null);
   };
   
   const handleClearData = async () => {
@@ -575,7 +593,7 @@ export default function SprintDashboard() {
   const handleFinalizeScope = async () => {
     if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
       if (!selectedSprint) return;
-
+      setUndoState(null); // Invalidate undo state on finalizing
       // Create a snapshot of the current tickets and mark them as initial scope
       const ticketsWithInitialScope = (selectedSprint.tickets || []).map(ticket => ({
         ...ticket,
@@ -656,7 +674,7 @@ export default function SprintDashboard() {
        {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={(s) => handleUpdateSprint(s)} />}
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
-       <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUploadTasks} onBulkLogProgress={handleBulkLogProgress} />
+       <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUpload(handleBulkUploadTasks, selectedSprint.tickets || [])} onBulkLogProgress={handleBulkUpload(handleBulkLogProgress, selectedSprint.tickets || [])} />
 
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
@@ -719,6 +737,8 @@ export default function SprintDashboard() {
             onFinalizeScope={handleFinalizeScope}
             onOpenAddTask={() => setIsAddTaskOpen(true)}
             onOpenBulkUpload={() => setIsBulkUploadOpen(true)}
+            onUndoLastUpload={handleUndoLastUpload}
+            canUndo={!!undoState}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
             onLogTime={handleLogRowAction}
@@ -822,7 +842,7 @@ export default function SprintDashboard() {
                               </CardTitle>
 
                               <div className="flex items-center gap-2">
-                                  <Button onClick={() => setIsBulkUploadOpen(true)} variant="outline" size="sm" disabled={isSprintCompleted}>
+                                  <Button onClick={() => { setUndoState({ tickets: selectedSprint.tickets || [] }); setIsBulkUploadOpen(true); }} variant="outline" size="sm" disabled={isSprintCompleted}>
                                       <Upload className="w-4 h-4 mr-2" />
                                       Bulk Upload
                                   </Button>
