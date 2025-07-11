@@ -103,7 +103,7 @@ export default function ReportClientPage() {
 
     // BDC Data Calculation
     const sprintStartDate = sprint.sprintDays[0]?.date
-    const initialTickets = sprint.tickets.filter(t => !t.creationDate || t.creationDate <= sprintStartDate);
+    const initialTickets = sprint.tickets.filter(t => t.isInitialScope);
     const initialScope = initialTickets.filter(t => t.typeScope !== 'Sprint').reduce((acc, t) => acc + t.estimation, 0)
     const initialBuildScope = initialTickets.filter(t => t.typeScope === 'Build').reduce((acc, t) => acc + t.estimation, 0)
     const initialRunScope = initialTickets.filter(t => t.typeScope === 'Run').reduce((acc, t) => acc + t.estimation, 0)
@@ -117,7 +117,7 @@ export default function ReportClientPage() {
         const isBuild = ticket.typeScope === 'Build';
         const isRun = ticket.typeScope === 'Run';
         
-        if (ticket.creationDate && ticket.creationDate > sprintStartDate) {
+        if (!ticket.isInitialScope && ticket.creationDate) {
             const delta = dailyDelta.get(ticket.creationDate)
             if (delta) {
                 if(isBuild || isRun) delta.newScope += ticket.estimation
@@ -301,9 +301,22 @@ export default function ReportClientPage() {
     document.body.removeChild(link)
   }
 
-  const renderContent = () => {
-    if (isLoading || !reportData) {
-      return (
+  if (isLoading) {
+    return <div className="p-6 bg-background">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="border-b pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-9 w-40" />
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-9 w-32" />
+            </div>
+          </div>
+        </div>
         <div className="space-y-4 p-6">
           <Skeleton className="h-8 w-1/4" />
           <Skeleton className="h-4 w-1/2" />
@@ -312,140 +325,24 @@ export default function ReportClientPage() {
             <Skeleton className="h-64 w-full" />
           </div>
         </div>
-      )
-    }
-
-    if (error) {
-      return (
-         <Alert variant="destructive" className="m-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )
-    }
-
-    if (sprint && reportContent) {
-      return (
-        <>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Brain className="w-5 h-5 text-purple-600" />
-                        AI Generated Analysis
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <MarkdownRenderer content={reportContent} />
-                </CardContent>
-            </Card>
-
-            <AIInsights />
-            
-            <Card>
-                <CardHeader><CardTitle>Sprint Burndown</CardTitle></CardHeader>
-                <CardContent>
-                    <ChartContainer
-                        config={{
-                            ideal: { label: "Ideal", color: "hsl(var(--muted-foreground))" },
-                            actual: { label: "Total", color: "hsl(var(--chart-1))" },
-                            build: { label: "Build", color: "hsl(var(--chart-2))" },
-                            run: { label: "Run", color: "hsl(var(--chart-3))" },
-                        }}
-                        className="h-[300px]"
-                    >
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={reportData.burndownData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="day" />
-                            <YAxis />
-                            <RechartsTooltip content={<ChartTooltipContent />} />
-                            <Line type="monotone" dataKey="ideal" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" name="Ideal" dot={false}/>
-                            <Line type="monotone" dataKey="actual" stroke="hsl(var(--chart-1))" name="Total" dot={false}/>
-                            <Line type="monotone" dataKey="build" stroke="hsl(var(--chart-2))" name="Build" dot={false}/>
-                            <Line type="monotone" dataKey="run" stroke="hsl(var(--chart-3))" name="Run" dot={false}/>
-                        </LineChart>
-                    </ResponsiveContainer>
-                    </ChartContainer>
-                </CardContent>
-            </Card>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle>Work Distribution by Type</CardTitle></CardHeader>
-                    <CardContent>
-                        <ChartContainer config={{}} className="h-[250px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                <Pie data={reportData.workDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
-                                    <Cell fill="hsl(var(--chart-1))" />
-                                    <Cell fill="hsl(var(--chart-2))" />
-                                    <Cell fill="hsl(var(--chart-3))" />
-                                </Pie>
-                                <RechartsTooltip content={<ChartTooltipContent />} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader><CardTitle>Total Daily Progress</CardTitle></CardHeader>
-                    <CardContent className="flex items-center justify-center h-[250px]">
-                        <div className="text-center p-4 bg-muted/50 rounded-lg w-full">
-                            <div className="text-4xl font-bold">{reportData.dailyTotalSummary.total.toFixed(1)}h</div>
-                            <div className="text-sm text-muted-foreground mb-4">Total Logged</div>
-                             <div className="flex justify-center gap-4 text-sm">
-                                <span>Build: {reportData.dailyTotalSummary.build.toFixed(1)}h</span>
-                                <span>Run: {reportData.dailyTotalSummary.run.toFixed(1)}h</span>
-                                <span>Buffer: {reportData.dailyTotalSummary.buffer.toFixed(1)}h</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader><CardTitle>Team Capacity & Delivery</CardTitle></CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Team</TableHead>
-                            <TableHead className="text-right">Planned</TableHead>
-                            <TableHead className="text-right">Completed</TableHead>
-                            <TableHead className="text-right">Efficiency</TableHead>
-                            <TableHead className="w-[200px]">Progress</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reportData.teamPerformanceData.map(data => (
-                            <TableRow key={data.team}>
-                                <TableCell className="font-medium">{data.team}</TableCell>
-                                <TableCell className="text-right">{data.planned.toFixed(1)}h</TableCell>
-                                <TableCell className="text-right">{data.completed.toFixed(1)}h</TableCell>
-                                <TableCell className="text-right">{data.efficiency.toFixed(1)}%</TableCell>
-                                <TableCell><Progress value={data.efficiency} /></TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow className="font-bold bg-muted/50">
-                            <TableCell>Totals</TableCell>
-                            <TableCell className="text-right">{reportData.teamTotals.planned.toFixed(1)}h</TableCell>
-                            <TableCell className="text-right">{reportData.teamTotals.completed.toFixed(1)}h</TableCell>
-                            <TableCell colSpan={2} className="text-right">{((reportData.teamTotals.completed / reportData.teamTotals.planned || 0) * 100).toFixed(1)}%</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </CardContent>
-            </Card>
-        </>
-      )
-    }
-    
-    return <p className="p-6">No report to display.</p>
+      </div>
+    </div>
   }
 
+  if (error) {
+    return (
+      <Alert variant="destructive" className="m-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (!sprint || !reportData) {
+    return <div className="p-6 text-center">Sprint data could not be loaded.</div>;
+  }
+  
   return (
     <div className="p-6 bg-background">
       <div className="max-w-6xl mx-auto space-y-8" ref={reportRef}>
@@ -478,7 +375,121 @@ export default function ReportClientPage() {
               </div>
           </div>
           
-          {renderContent()}
+          {reportContent && (
+            <>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Brain className="w-5 h-5 text-purple-600" />
+                            AI Generated Analysis
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <MarkdownRenderer content={reportContent} />
+                    </CardContent>
+                </Card>
+
+                <AIInsights />
+                
+                <Card>
+                    <CardHeader><CardTitle>Sprint Burndown</CardTitle></CardHeader>
+                    <CardContent>
+                        <ChartContainer
+                            config={{
+                                ideal: { label: "Ideal", color: "hsl(var(--muted-foreground))" },
+                                actual: { label: "Total", color: "hsl(var(--chart-1))" },
+                                build: { label: "Build", color: "hsl(var(--chart-2))" },
+                                run: { label: "Run", color: "hsl(var(--chart-3))" },
+                            }}
+                            className="h-[300px]"
+                        >
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={reportData.burndownData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="day" />
+                                <YAxis />
+                                <RechartsTooltip content={<ChartTooltipContent />} />
+                                <Line type="monotone" dataKey="ideal" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" name="Ideal" dot={false}/>
+                                <Line type="monotone" dataKey="actual" stroke="hsl(var(--chart-1))" name="Total" dot={false}/>
+                                <Line type="monotone" dataKey="build" stroke="hsl(var(--chart-2))" name="Build" dot={false}/>
+                                <Line type="monotone" dataKey="run" stroke="hsl(var(--chart-3))" name="Run" dot={false}/>
+                            </LineChart>
+                        </ResponsiveContainer>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader><CardTitle>Work Distribution by Type</CardTitle></CardHeader>
+                        <CardContent>
+                            <ChartContainer config={{}} className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                    <Pie data={reportData.workDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} label>
+                                        <Cell fill="hsl(var(--chart-1))" />
+                                        <Cell fill="hsl(var(--chart-2))" />
+                                        <Cell fill="hsl(var(--chart-3))" />
+                                    </Pie>
+                                    <RechartsTooltip content={<ChartTooltipContent />} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Total Daily Progress</CardTitle></CardHeader>
+                        <CardContent className="flex items-center justify-center h-[250px]">
+                            <div className="text-center p-4 bg-muted/50 rounded-lg w-full">
+                                <div className="text-4xl font-bold">{reportData.dailyTotalSummary.total.toFixed(1)}h</div>
+                                <div className="text-sm text-muted-foreground mb-4">Total Logged</div>
+                                <div className="flex justify-center gap-4 text-sm">
+                                    <span>Build: {reportData.dailyTotalSummary.build.toFixed(1)}h</span>
+                                    <span>Run: {reportData.dailyTotalSummary.run.toFixed(1)}h</span>
+                                    <span>Buffer: {reportData.dailyTotalSummary.buffer.toFixed(1)}h</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card>
+                    <CardHeader><CardTitle>Team Capacity & Delivery</CardTitle></CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                <TableHead>Team</TableHead>
+                                <TableHead className="text-right">Planned</TableHead>
+                                <TableHead className="text-right">Completed</TableHead>
+                                <TableHead className="text-right">Efficiency</TableHead>
+                                <TableHead className="w-[200px]">Progress</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {reportData.teamPerformanceData.map(data => (
+                                <TableRow key={data.team}>
+                                    <TableCell className="font-medium">{data.team}</TableCell>
+                                    <TableCell className="text-right">{data.planned.toFixed(1)}h</TableCell>
+                                    <TableCell className="text-right">{data.completed.toFixed(1)}h</TableCell>
+                                    <TableCell className="text-right">{data.efficiency.toFixed(1)}%</TableCell>
+                                    <TableCell><Progress value={data.efficiency} /></TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFooter>
+                                <TableRow className="font-bold bg-muted/50">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right">{reportData.teamTotals.planned.toFixed(1)}h</TableCell>
+                                <TableCell className="text-right">{reportData.teamTotals.completed.toFixed(1)}h</TableCell>
+                                <TableCell colSpan={2} className="text-right">{((reportData.teamTotals.completed / reportData.teamTotals.planned || 0) * 100).toFixed(1)}%</TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </>
+          )}
           
           <div className="border-t pt-6 text-center text-sm text-gray-500">
             {generatedAt && (
