@@ -3,6 +3,8 @@
 
 import * as React from 'react';
 import { useMemo } from 'react';
+import { getCoreRowModel, getFacetedRowModel, getFacetedUniqueValues, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnFiltersState, type SortingState, type VisibilityState } from '@tanstack/react-table';
+
 import { platforms } from "./data";
 import type { Sprint, Ticket, Team, TeamCapacity } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,7 +33,7 @@ import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
 import { DataTableToolbar } from './data-table-toolbar';
-import { useSprints } from '@/hooks/use-sprints';
+import { useSprints } from '@/hooks/use-sprints.tsx';
 
 const SprintScopingView = ({
   sprint,
@@ -77,9 +79,6 @@ const SprintScopingView = ({
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}
           onLogTime={onLogTime}
-          onOpenAddTask={onOpenAddTask}
-          onOpenBulkUpload={onOpenBulkUpload}
-          onOpenLogProgress={() => { /* Not needed in scoping view */}}
         />
         <div className="mt-6 flex justify-end">
           <Button onClick={onFinalizeScope} size="lg">
@@ -121,7 +120,7 @@ export default function SprintDashboard() {
       isBulkUploadOpen, setIsBulkUploadOpen
   } = useSprints();
 
-  
+
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
 
@@ -263,6 +262,48 @@ export default function SprintDashboard() {
     setTaskToLog(task);
     setIsLogProgressOpen(true);
   };
+  
+    // Table state
+  const [rowSelection, setRowSelection] = React.useState({})
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  )
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  
+  const sprintDayMap = React.useMemo(() => {
+    if (!processedSprint?.sprintDays) return new Map<string, number>();
+    return new Map(processedSprint.sprintDays.map((d) => [d.date, d.day]));
+  }, [processedSprint?.sprintDays]);
+  
+  const table = useReactTable({
+    data: processedSprint?.tickets || [],
+    columns,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnFilters,
+    },
+    meta: {
+      onUpdateTask: handleUpdateTask,
+      onDeleteTask: handleDeleteTask,
+      onLogTime: handleLogRowAction,
+      sprint: processedSprint,
+      sprintDayMap,
+    },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+  })
   
   if (isLoading) {
     return (
@@ -482,19 +523,10 @@ export default function SprintDashboard() {
                 <Card>
                     <CardHeader>
                        <DataTableToolbar
-                            table={null as any} // This will be managed inside SprintTasksView
-                            viewMode={'list'}
-                            onViewModeChange={() => {}}
-                            groupBy={null}
-                            onGroupByChange={() => {}}
-                            showInitialScopeOnly={false}
-                            onShowInitialScopeOnlyChange={() => {}}
-                            taskCount={processedSprint.tickets?.length || 0}
+                            table={table}
                             isSprintCompleted={isSprintCompleted}
                             onOpenAddTask={() => setIsAddTaskOpen(true)}
-                            onOpenBulkUpload={() => {
-                                setIsBulkUploadOpen(true);
-                            }}
+                            onOpenBulkUpload={() => setIsBulkUploadOpen(true)}
                             onOpenLogProgress={() => {
                                 setTaskToLog(null);
                                 setIsLogProgressOpen(true);
@@ -503,20 +535,13 @@ export default function SprintDashboard() {
                     </CardHeader>
                     <CardContent>
                       <SprintTasksView
+                          table={table}
                           columns={columns}
                           data={processedSprint.tickets || []}
                           sprint={processedSprint}
                           onUpdateTask={handleUpdateTask}
                           onDeleteTask={handleDeleteTask}
                           onLogTime={handleLogRowAction}
-                          onOpenAddTask={() => setIsAddTaskOpen(true)}
-                          onOpenBulkUpload={() => {
-                              setIsBulkUploadOpen(true);
-                          }}
-                          onOpenLogProgress={() => {
-                              setTaskToLog(null);
-                              setIsLogProgressOpen(true);
-                          }}
                       />
                     </CardContent>
                 </Card>

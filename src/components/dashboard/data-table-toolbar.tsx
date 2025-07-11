@@ -16,14 +16,7 @@ import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 
 interface DataTableToolbarProps<TData> {
-  table: Table<TData>,
-  viewMode: 'list' | 'cards' | 'kanban'
-  onViewModeChange: (mode: 'list' | 'cards' | 'kanban') => void
-  groupBy: 'status' | 'platform' | 'day' | null
-  onGroupByChange: (value: 'status' | 'platform' | 'day' | null) => void
-  showInitialScopeOnly: boolean
-  onShowInitialScopeOnlyChange: (value: boolean) => void
-  taskCount: number
+  table: Table<TData>
   isSprintCompleted: boolean
   onOpenAddTask: () => void;
   onOpenBulkUpload: () => void;
@@ -32,18 +25,21 @@ interface DataTableToolbarProps<TData> {
 
 export function DataTableToolbar<TData>({
   table,
-  viewMode,
-  onViewModeChange,
-  groupBy,
-  onGroupByChange,
-  showInitialScopeOnly,
-  onShowInitialScopeOnlyChange,
-  taskCount,
   isSprintCompleted,
   onOpenAddTask,
   onOpenBulkUpload,
   onOpenLogProgress,
 }: DataTableToolbarProps<TData>) {
+  
+  const { 
+    viewMode,
+    onViewModeChange,
+    groupBy,
+    onGroupByChange,
+    showInitialScopeOnly,
+    onShowInitialScopeOnlyChange,
+  } = table.options.meta as any;
+
   const isFiltered = table.getState().columnFilters.length > 0 || showInitialScopeOnly
   const [filtersVisible, setFiltersVisible] = React.useState(false)
 
@@ -66,7 +62,7 @@ export function DataTableToolbar<TData>({
         <div className="flex flex-1 items-center space-x-2">
            <CardTitle className="flex items-center gap-2 text-xl">
                 Sprint Tasks
-                <Badge variant="outline">{taskCount}</Badge>
+                <Badge variant="outline">{table.getPreFilteredRowModel().rows.length}</Badge>
             </CardTitle>
           <Input
             placeholder="Filter tasks..."

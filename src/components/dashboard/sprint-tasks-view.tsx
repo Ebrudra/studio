@@ -4,19 +4,9 @@
 import * as React from "react"
 import {
   ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   flexRender,
-  getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
   Row,
-  Table,
+  Table as ReactTableInstance,
 } from "@tanstack/react-table"
 import { statuses, platforms } from "./data"
 import {
@@ -30,48 +20,47 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 import { DataTablePagination } from "./data-table-pagination"
-import { DataTableToolbar } from "./data-table-toolbar"
 import { TaskCard } from "./task-card"
 import type { Sprint, Ticket } from "@/types"
 
 interface SprintTasksViewProps<TData, TValue> {
+  table: ReactTableInstance<TData>
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   sprint: Sprint
   onUpdateTask: (task: Ticket) => void
   onDeleteTask: (taskId: string) => void
   onLogTime: (task: Ticket) => void
-  onOpenAddTask: () => void;
-  onOpenBulkUpload: () => void;
-  onOpenLogProgress: () => void;
 }
 
 export function SprintTasksView<TData extends Ticket, TValue>({
+  table,
   columns,
   data,
   sprint,
   onUpdateTask,
   onDeleteTask,
   onLogTime,
-  onOpenAddTask,
-  onOpenBulkUpload,
-  onOpenLogProgress,
 }: SprintTasksViewProps<TData, TValue>) {
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  
   const [viewMode, setViewMode] = React.useState<'list' | 'cards' | 'kanban'>('list');
   const [groupBy, setGroupBy] = React.useState<'status' | 'platform' | 'day' | null>(null);
   const [showInitialScopeOnly, setShowInitialScopeOnly] = React.useState(false);
 
-
-  const sprintDayMap = React.useMemo(() => {
-    if (!sprint.sprintDays) return new Map<string, number>();
-    return new Map(sprint.sprintDays.map((d) => [d.date, d.day]));
-  }, [sprint.sprintDays]);
+  React.useEffect(() => {
+    table.setOptions(prev => ({
+      ...prev,
+      meta: {
+        ...prev.meta,
+        viewMode,
+        onViewModeChange: setViewMode,
+        groupBy,
+        onGroupByChange: setGroupBy,
+        showInitialScopeOnly,
+        onShowInitialScopeOnlyChange: setShowInitialScopeOnly,
+      }
+    }));
+  }, [table, viewMode, groupBy, showInitialScopeOnly]);
   
   const filteredData = React.useMemo(() => {
     if (showInitialScopeOnly) {
@@ -80,34 +69,9 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     return data;
   }, [data, showInitialScopeOnly]);
 
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-      columnFilters,
-    },
-    meta: {
-      onUpdateTask,
-      onDeleteTask,
-      onLogTime,
-      sprint,
-      sprintDayMap,
-    },
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  React.useEffect(() => {
+    table.setOptions(prev => ({ ...prev, data: filteredData }));
+  }, [table, filteredData]);
   
   const allFilteredTasks = table.getFilteredRowModel().rows.map(row => row.original as Ticket);
   
@@ -167,7 +131,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
     return Object.fromEntries(Object.entries(grouped).filter(([, rows]) => rows.length > 0));
   }, [table, groupBy, sprint.sprintDays]);
   
-  const renderContent = (table: Table<TData>) => {
+  const renderContent = (table: ReactTableInstance<TData>) => {
     const dataToRender = groupedData ? Object.entries(groupedData) : [['all', table.getRowModel().rows]];
     const isGrouped = !!groupedData;
 
@@ -184,7 +148,7 @@ export function SprintTasksView<TData extends Ticket, TValue>({
         const orderedKanbanColumns = statuses.map(s => {
             const found = kanbanColumns.find(([key]) => key === s.value);
             return found ? found : [s.value, []];
-        }).filter(([,tasks]) => tasks.length > 0);
+        }).filter(([,tasks]) => tasks.length > 0 || isGrouped);
 
         return (
           <div className="flex gap-6 overflow-x-auto pb-4 -mx-6 px-6">
@@ -335,20 +299,6 @@ export function SprintTasksView<TData extends Ticket, TValue>({
 
   return (
     <div className="space-y-4">
-        <DataTableToolbar
-            table={table}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-            showInitialScopeOnly={showInitialScopeOnly}
-            onShowInitialScopeOnlyChange={setShowInitialScopeOnly}
-            taskCount={(data || []).length}
-            isSprintCompleted={sprint.status === 'Completed'}
-            onOpenAddTask={onOpenAddTask}
-            onOpenBulkUpload={onOpenBulkUpload}
-            onOpenLogProgress={onOpenLogProgress}
-        />
         {renderContent(table)}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
             <div className="text-center p-3 bg-success/10 rounded-lg border">
