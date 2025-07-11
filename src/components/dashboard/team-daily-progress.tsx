@@ -208,32 +208,32 @@ const TeamDailyProgressGrid = ({ dailyProgress }: TeamDailyProgressProps) => {
     }, [dailyProgress]);
     
     const totalSummary = React.useMemo(() => {
-        const summary: Record<string, { build: number, run: number, buffer: number, total: number }> = {} as any;
-        let dailyTotals = { build: 0, run: 0, buffer: 0, total: 0 };
-    
-        activeTeams.forEach(team => {
-          summary[team.value] = { build: 0, run: 0, buffer: 0, total: 0 };
+        const teamTotals: Record<Team, { build: number, run: number, buffer: number, total: number }> = {} as any;
+        const dailyTotals = { build: 0, run: 0, buffer: 0, total: 0 };
+
+        allTeams.forEach(team => {
+          teamTotals[team.value] = { build: 0, run: 0, buffer: 0, total: 0 };
         });
     
         dailyProgress.forEach(day => {
-          activeTeams.forEach(team => {
+          allTeams.forEach(team => {
             const p = day.progress[team.value];
             if (p) {
-              summary[team.value].build += p.build;
-              summary[team.value].run += p.run;
-              summary[team.value].buffer += p.buffer;
-              summary[team.value].total += (p.build + p.run + p.buffer);
+              teamTotals[team.value].build += p.build;
+              teamTotals[team.value].run += p.run;
+              teamTotals[team.value].buffer += p.buffer;
+              teamTotals[team.value].total += (p.build + p.run + p.buffer);
             }
           });
         });
     
-        dailyTotals.build = activeTeams.reduce((sum, team) => sum + summary[team.value].build, 0);
-        dailyTotals.run = activeTeams.reduce((sum, team) => sum + summary[team.value].run, 0);
-        dailyTotals.buffer = activeTeams.reduce((sum, team) => sum + summary[team.value].buffer, 0);
-        dailyTotals.total = activeTeams.reduce((sum, team) => sum + summary[team.value].total, 0);
+        dailyTotals.build = Object.values(teamTotals).reduce((sum, team) => sum + team.build, 0);
+        dailyTotals.run = Object.values(teamTotals).reduce((sum, team) => sum + team.run, 0);
+        dailyTotals.buffer = Object.values(teamTotals).reduce((sum, team) => sum + team.buffer, 0);
+        dailyTotals.total = Object.values(teamTotals).reduce((sum, team) => sum + team.total, 0);
     
-        return { teams: summary, dailyTotals };
-      }, [dailyProgress, activeTeams]);
+        return { teams: teamTotals, dailyTotals };
+    }, [dailyProgress]);
 
 
     const teamColors: Record<string, { bg: string, border: string, text: string }> = {
