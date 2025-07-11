@@ -2,11 +2,9 @@
 "use client";
 
 import * as React from 'react';
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { platforms as platformTeams } from "./data";
-import { assigneeConfig } from '@/lib/config';
-import type { Sprint, Ticket, DailyLog, TicketStatus, TicketTypeScope, Team, TeamCapacity, SprintDay } from '@/types';
-import { format } from "date-fns";
+import { useMemo } from 'react';
+import { platforms } from "./data";
+import type { Sprint, Ticket, Team, TeamCapacity } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,10 +30,8 @@ import { AddTaskDialog } from './add-task-dialog';
 import { Skeleton } from '../ui/skeleton';
 import { LogProgressDialog, type LogProgressData } from './log-progress-dialog';
 import { BulkUploadDialog, type BulkTask, type BulkProgressLog } from './bulk-upload-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { getSprints, addSprint, updateSprint, deleteSprint, syncSprint } from '@/actions/sprints';
-import { ToastAction } from '../ui/toast';
 import { DataTableToolbar } from './data-table-toolbar';
+import { useSprints } from '@/hooks/use-sprints';
 
 const SprintScopingView = ({
   sprint,
@@ -44,7 +40,9 @@ const SprintScopingView = ({
   onOpenBulkUpload,
   onUndoLastUpload,
   canUndo,
-  ...taskViewProps
+  onUpdateTask,
+  onDeleteTask,
+  onLogTime,
 }: {
   sprint: Sprint;
   onFinalizeScope: () => void;
@@ -76,7 +74,12 @@ const SprintScopingView = ({
           columns={columns}
           data={sprint.tickets || []}
           sprint={sprint}
-          {...taskViewProps}
+          onUpdateTask={onUpdateTask}
+          onDeleteTask={onDeleteTask}
+          onLogTime={onLogTime}
+          onOpenAddTask={onOpenAddTask}
+          onOpenBulkUpload={onOpenBulkUpload}
+          onOpenLogProgress={() => { /* Not needed in scoping view */}}
         />
         <div className="mt-6 flex justify-end">
           <Button onClick={onFinalizeScope} size="lg">
@@ -88,50 +91,36 @@ const SprintScopingView = ({
 );
 
 export default function SprintDashboard() {
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [selectedSprintId, setSelectedSprintId] = useState<string | undefined>();
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+      sprints,
+      selectedSprint,
+      selectedSprintId,
+      setSelectedSprintId,
+      isLoading,
+      handleCreateSprint,
+      handleUpdateSprint,
+      handleDeleteSprint,
+      handleAddTask,
+      handleUpdateTask,
+      handleDeleteTask,
+      handleLogProgress,
+      handleBulkUploadTasks,
+      handleBulkLogProgress,
+      handleFinalizeScope,
+      handleEditScope,
+      handleCompleteSprint,
+      handleClearData,
+      handleSyncToFirebase,
+      undoState,
+      handleUndoLastUpload,
+      isNewSprintOpen, setIsNewSprintOpen,
+      isEditSprintOpen, setIsEditSprintOpen,
+      isAddTaskOpen, setIsAddTaskOpen,
+      isLogProgressOpen, setIsLogProgressOpen,
+      taskToLog, setTaskToLog,
+      isBulkUploadOpen, setIsBulkUploadOpen
+  } = useSprints();
 
-  const [isNewSprintOpen, setIsNewSprintOpen] = useState(false);
-  const [isEditSprintOpen, setIsEditSprintOpen] = useState(false);
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [isLogProgressOpen, setIsLogProgressOpen] = useState(false);
-  const [taskToLog, setTaskToLog] = useState<Ticket | null>(null);
-  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [undoState, setUndoState] = useState<{ tickets: Ticket[] } | null>(null);
-
-  const { toast } = useToast();
-  
-  const fetchSprints = useCallback(async (sprintToSelectId?: string) => {
-    setIsLoading(true);
-    try {
-        const sprintsFromFs = await getSprints();
-        setSprints(sprintsFromFs);
-
-        if (sprintToSelectId) {
-            setSelectedSprintId(sprintToSelectId);
-        } else if (sprintsFromFs.length > 0 && !selectedSprintId) {
-            setSelectedSprintId(sprintsFromFs[0].id);
-        } else if (sprintsFromFs.length === 0) {
-            setSelectedSprintId(undefined);
-        }
-    } catch (err) {
-        console.error("Failed to fetch sprints:", err);
-        toast({ variant: "destructive", title: "Error", description: "Could not load sprints." });
-    } finally {
-        setIsLoading(false);
-    }
-  }, [selectedSprintId, toast]);
-
-  useEffect(() => {
-    fetchSprints();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  
-  const selectedSprint = useMemo<Sprint | undefined>(
-    () => sprints.find((sprint) => sprint.id === selectedSprintId),
-    [sprints, selectedSprintId]
-  );
   
   const processedSprint = useMemo(() => {
     if (!selectedSprint) return null;
@@ -141,7 +130,7 @@ export default function SprintDashboard() {
     // Recalculate capacities to ensure they are always up-to-date with person days
     const teamCapacity: Record<Team, TeamCapacity> = {} as any;
     if (selectedSprint.teamPersonDays) {
-      for (const team of platformTeams) {
+      for (const team of platforms) {
         const personDays = selectedSprint.teamPersonDays[team.value] ?? 0;
         teamCapacity[team.value] = {
           plannedBuild: personDays * 6,
@@ -175,7 +164,7 @@ export default function SprintDashboard() {
         if (ticket.dailyLogs) {
             for (const log of ticket.dailyLogs) {
                 if (!dataByDate.has(log.date)) {
-                    dataByDate.set(log.date, platformTeams.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>));
+                    dataByDate.set(log.date, platforms.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>));
                 }
                 const dayData = dataByDate.get(log.date)!;
                 if(dayData[ticket.platform]) {
@@ -194,7 +183,7 @@ export default function SprintDashboard() {
     return (selectedSprint.sprintDays || []).map(dayInfo => ({
         day: dayInfo.day,
         date: dayInfo.date,
-        progress: dataByDate.get(dayInfo.date) || platformTeams.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>)
+        progress: dataByDate.get(dayInfo.date) || platforms.reduce((acc, team) => ({...acc, [team.value]: {build: 0, run: 0, buffer: 0}}), {} as Record<Team, { build: number; run: number, buffer: 0 }>)
     }));
   }, [selectedSprint]);
 
@@ -270,354 +259,11 @@ export default function SprintDashboard() {
 
   }, [sprints, selectedSprint, processedSprint]);
   
-  const handleCreateSprint = async (newSprintData: Omit<Sprint, 'id' | 'lastUpdatedAt'>) => {
-    try {
-        const newSprint = await addSprint(newSprintData);
-        await fetchSprints(newSprint.id);
-        toast({ title: "Sprint Created", description: `Sprint "${newSprint.name}" has been successfully created.` });
-    } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to create new sprint." });
-       console.error("Error creating sprint:", error);
-    }
-  };
-  
-  const handleUpdateSprint = async (updatedSprintData: Partial<Omit<Sprint, 'id'>>, showToast = true) => {
-    if (!selectedSprintId) return;
-    try {
-        const updatedSprint = await updateSprint(selectedSprintId, updatedSprintData);
-        setSprints(s => s.map(sp => sp.id === selectedSprintId ? updatedSprint : sp));
-        if (showToast) {
-            toast({ title: "Sprint Updated", description: "Sprint details have been saved." });
-        }
-    } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Failed to update sprint." });
-        console.error("Error updating sprint:", error);
-    }
-  };
-
-  const handleAddTask = async (newTaskData: Omit<Ticket, "timeLogged">) => {
-    if (!selectedSprint) return;
-    const isOutOfScope = selectedSprint.status === 'Active' && newTaskData.typeScope === 'Build';
-    const newTask: Ticket = {
-      ...newTaskData,
-      title: newTaskData.title || newTaskData.id,
-      timeLogged: 0,
-      dailyLogs: [],
-      creationDate: new Date().toISOString().split('T')[0],
-      isOutOfScope,
-    };
-    setUndoState(null); // Invalidate undo state on manual change
-    await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), newTask] });
-  };
-
-  const handleUpdateTask = async (updatedTask: Ticket) => {
-    if (!selectedSprint) return;
-    const finalTask = { ...updatedTask, title: updatedTask.title || updatedTask.id };
-    if (finalTask.type === 'Bug' || finalTask.type === 'Buffer') {
-      finalTask.estimation = finalTask.timeLogged;
-    }
-    const newTickets = (selectedSprint.tickets || []).map(t => (t.id === finalTask.id) ? finalTask : t);
-    setUndoState(null); // Invalidate undo state on manual change
-    await handleUpdateSprint({ tickets: newTickets });
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    if (!selectedSprint) return;
-    const newTickets = (selectedSprint.tickets || []).filter(t => t.id !== taskId);
-    setUndoState(null); // Invalidate undo state on manual change
-    await handleUpdateSprint({ tickets: newTickets });
-    toast({ title: "Task Deleted", description: `Task ${taskId} has been removed.` })
-  };
-  
   const handleLogRowAction = (task: Ticket) => {
     setTaskToLog(task);
     setIsLogProgressOpen(true);
   };
-
-  const handleLogProgress = async (data: LogProgressData) => {
-    if (!selectedSprint) return;
-
-    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
-    const isNewTicket = data.ticketId === 'new-ticket';
-    const ticketId = isNewTicket ? data.newTicketId! : data.ticketId!;
-    let ticket = newTickets.find((t: Ticket) => t.id === ticketId);
-    
-    const dayNumber = parseInt(data.day.replace('D', ''), 10);
-    const logDate = selectedSprint.sprintDays.find(d => d.day === dayNumber)?.date;
-    if (!logDate) return;
-
-    const newLog: DailyLog = {
-      date: logDate,
-      loggedHours: data.loggedHours,
-    };
-
-    if (isNewTicket) {
-      const isOutOfScope = selectedSprint.status === 'Active' && data.typeScope === 'Build';
-      const newTicketToAdd: Ticket = {
-        id: ticketId,
-        title: data.newTicketTitle || data.newTicketId!,
-        platform: data.platform,
-        type: data.type,
-        typeScope: data.typeScope,
-        estimation: data.estimation,
-        status: data.status,
-        dailyLogs: [newLog],
-        timeLogged: newLog.loggedHours,
-        creationDate: new Date(logDate).toISOString().split('T')[0],
-        description: data.newTicketDescription,
-        tags: data.newTicketTags ? data.newTicketTags.split(',').map(t => t.trim()) : [],
-        assignee: assigneeConfig[data.platform],
-        isOutOfScope,
-      };
-      if (newTicketToAdd.type === 'Bug' || newTicketToAdd.type === 'Buffer') {
-        newTicketToAdd.estimation = newTicketToAdd.timeLogged;
-      }
-      if (newTicketToAdd.status === 'Done') {
-        newTicketToAdd.completionDate = new Date(logDate).toISOString().split('T')[0];
-      }
-      newTickets.push(newTicketToAdd);
-    } else if (ticket) {
-      const newDailyLogs = [...(ticket.dailyLogs || [])];
-      const existingLogIndex = newDailyLogs.findIndex(l => l.date === logDate);
-
-      if (existingLogIndex !== -1) {
-        newDailyLogs[existingLogIndex].loggedHours += data.loggedHours;
-      } else {
-        newDailyLogs.push(newLog);
-      }
-      
-      const timeLogged = newDailyLogs.reduce((acc, log) => acc + log.loggedHours, 0);
-      const wasDone = ticket.status === 'Done';
-      const isDone = data.status === 'Done';
-
-      ticket.status = data.status;
-      ticket.dailyLogs = newDailyLogs;
-      ticket.timeLogged = timeLogged;
-      
-      if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
-        ticket.estimation = timeLogged;
-      }
-
-      if (!wasDone && isDone) {
-        ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
-      } else if (wasDone && !isDone) {
-        delete ticket.completionDate;
-      }
-    }
-    setUndoState(null); // Invalidate undo state on manual change
-    await handleUpdateSprint({ tickets: newTickets });
-  };
   
-  const handleBulkUpload = (uploadFn: (data: any[]) => void, originalTickets: Ticket[]) => (data: any[]) => {
-    setUndoState({ tickets: originalTickets });
-    uploadFn(data);
-    toast({
-      title: "Bulk Upload Successful",
-      description: "Data has been imported. You can undo this action.",
-      action: <ToastAction altText="Undo" onClick={handleUndoLastUpload}>Undo</ToastAction>,
-    });
-  };
-  
-  const handleBulkUploadTasks = async (tasks: BulkTask[]) => {
-    if (!selectedSprint) return;
-    
-    const existingTicketIds = new Set((selectedSprint.tickets || []).map(t => t.id));
-    const uniqueNewTickets = tasks.filter(t => !existingTicketIds.has(t.id));
-    
-    const newTickets: Ticket[] = uniqueNewTickets.map(task => {
-        let typeScope: TicketTypeScope = 'Build';
-        if (task.type === 'Bug') typeScope = 'Run';
-        else if (task.type === 'Buffer') typeScope = 'Sprint';
-
-        const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
-        const canonicalPlatform = platformTeams.find(t => t.value.toLowerCase() === task.platform.toLowerCase())?.value || 'Web';
-        const estimation = Number(task.estimation) || 0;
-        const tags = task.tags ? task.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
-
-        return {
-          id: task.id,
-          title: task.title || task.id,
-          description: task.description,
-          platform: canonicalPlatform,
-          type: task.type,
-          estimation: estimation,
-          typeScope,
-          timeLogged: 0,
-          dailyLogs: [],
-          status: 'To Do',
-          creationDate: new Date().toISOString().split('T')[0],
-          assignee: assigneeConfig[canonicalPlatform],
-          tags: tags,
-          isOutOfScope,
-        };
-      });
-
-    if (newTickets.length > 0) {
-      await handleUpdateSprint({ tickets: [...(selectedSprint.tickets || []), ...newTickets]}, false);
-    }
-  };
-
-  const handleBulkLogProgress = async (logs: BulkProgressLog[]) => {
-    if (!selectedSprint) return;
-    
-    let newTickets = JSON.parse(JSON.stringify(selectedSprint.tickets || []));
-    const dayToDateMap = new Map<number, string>();
-    (selectedSprint.sprintDays || []).forEach(d => dayToDateMap.set(d.day, d.date));
-      
-    logs.sort((a, b) => {
-        const dayA = parseInt(a.day?.replace('D', '') || '0', 10);
-        const dayB = parseInt(b.day?.replace('D', '') || '0', 10);
-        return dayA - dayB;
-    });
-
-    for (const log of logs) {
-      if (!log.ticketId || !log.day || !log.loggedHours || !log.status) continue;
-      
-      const dayNumber = parseInt(log.day.replace('D', ''), 10);
-      if (isNaN(dayNumber)) continue;
-      
-      const logDate = dayToDateMap.get(dayNumber);
-      if (!logDate) continue;
-
-      let ticket = newTickets.find((t: Ticket) => t.id === log.ticketId);
-
-      if (!ticket) {
-        if (!log.platform || !log.type) continue;
-        
-        let typeScope: TicketTypeScope = log.typeScope || 'Build';
-        if (log.type === 'Bug') typeScope = 'Run';
-        else if (log.type === 'Buffer') typeScope = 'Sprint';
-        else if (log.type === 'User story') typeScope = 'Build';
-        
-        const isOutOfScope = selectedSprint.status === 'Active' && typeScope === 'Build';
-        const estimation = Number(log.estimation) || ((log.type === 'Bug' || log.type === 'Buffer') ? Number(log.loggedHours) : 0);
-        const canonicalPlatform = platformTeams.find(t => t.value.toLowerCase() === log.platform!.toLowerCase())?.value || 'Web';
-        const tags = log.tags ? log.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-
-        ticket = {
-          id: log.ticketId,
-          title: log.title || log.ticketId,
-          description: log.description,
-          platform: canonicalPlatform,
-          type: log.type,
-          typeScope: typeScope,
-          estimation: estimation,
-          status: 'To Do',
-          timeLogged: 0,
-          dailyLogs: [],
-          isOutOfScope,
-          creationDate: new Date(logDate).toISOString().split('T')[0],
-          assignee: assigneeConfig[canonicalPlatform],
-          tags: tags,
-        };
-        newTickets.push(ticket);
-      }
-
-      if (!ticket.dailyLogs) {
-        ticket.dailyLogs = [];
-      }
-
-      const newLog: DailyLog = { date: logDate, loggedHours: Number(log.loggedHours) || 0 };
-      const existingLogIndex = ticket.dailyLogs.findIndex((l: DailyLog) => l.date === logDate);
-
-      if (existingLogIndex > -1) {
-        ticket.dailyLogs[existingLogIndex].loggedHours += newLog.loggedHours;
-      } else {
-        ticket.dailyLogs.push(newLog);
-      }
-
-      ticket.status = log.status;
-      const wasDone = !!ticket.completionDate;
-      const isDone = log.status === 'Done';
-
-      if (!wasDone && isDone) {
-        ticket.completionDate = new Date(logDate).toISOString().split('T')[0];
-      } else if (wasDone && !isDone) {
-        delete ticket.completionDate;
-      }
-
-    }
-    
-    newTickets.forEach((ticket: Ticket) => {
-        if (ticket.dailyLogs) {
-            ticket.timeLogged = ticket.dailyLogs.reduce((acc: number, log: DailyLog) => acc + log.loggedHours, 0);
-            if (ticket.type === 'Bug' || ticket.type === 'Buffer') {
-                ticket.estimation = ticket.timeLogged;
-            }
-        }
-    });
-
-    await handleUpdateSprint({ tickets: newTickets }, false);
-  };
-
-  const handleUndoLastUpload = async () => {
-    if (!undoState) return;
-    await handleUpdateSprint({ tickets: undoState.tickets }, false);
-    toast({ title: "Undo Successful", description: "Reverted to the state before the last upload." });
-    setUndoState(null);
-  };
-  
-  const handleClearData = async () => {
-    if (window.confirm("Are you sure you want to clear all tickets and logs for this sprint? This action cannot be undone.")) {
-      await handleUpdateSprint({ tickets: [], reportFilePaths: [], isSyncedToFirebase: false });
-      toast({ title: "Sprint Data Cleared", description: "All tickets and logs have been removed." });
-    }
-  };
-
-  const handleCompleteSprint = async () => {
-    if (window.confirm("Are you sure you want to complete this sprint? You will no longer be able to edit it.")) {
-      await handleUpdateSprint({ status: 'Completed' });
-      toast({ title: "Sprint Completed", description: "The sprint has been archived." });
-    }
-  };
-
-  const handleDeleteSprint = async () => {
-    if (!selectedSprintId || !selectedSprint) return;
-    if (window.confirm(`Are you sure you want to delete sprint: "${selectedSprint?.name}"? This action cannot be undone.`)) {
-      await deleteSprint(selectedSprintId);
-      setSelectedSprintId(undefined); // Reset selection
-      await fetchSprints();
-    }
-  };
-
-  const handleFinalizeScope = async () => {
-    if (window.confirm("Are you sure you want to finalize the scope? You won't be able to add more 'Build' tickets to the initial scope after this.")) {
-      if (!selectedSprint) return;
-      setUndoState(null); // Invalidate undo state on finalizing
-      // Create a snapshot of the current tickets and mark them as initial scope
-      const ticketsWithInitialScope = (selectedSprint.tickets || []).map(ticket => ({
-        ...ticket,
-        isInitialScope: true,
-      }));
-
-      await handleUpdateSprint({
-        status: 'Active',
-        tickets: ticketsWithInitialScope,
-      });
-
-      toast({ title: "Sprint Scope Finalized", description: "The sprint is now active." });
-    }
-  };
-
-  const handleEditScope = async () => {
-     if (window.confirm("This will revert the sprint to the 'Scoping' phase, allowing you to change which tasks are part of the initial scope. Continue?")) {
-        await handleUpdateSprint({ status: 'Scoping' });
-        toast({ title: "Sprint reverted to Scoping", description: "You can now edit the initial scope." });
-    }
-  };
-
-   const handleSyncToFirebase = async () => {
-    if (!selectedSprintId) return;
-    try {
-        const syncedSprint = await syncSprint(selectedSprintId);
-        await fetchSprints(selectedSprintId);
-        toast({ title: "Sprint Synced", description: "Sprint has been backed up to Firebase." });
-    } catch (error) {
-        console.error("Failed to sync sprint:", error);
-        toast({ variant: "destructive", title: "Sync Failed", description: "Could not sync sprint to Firebase." });
-    }
-  };
-
   if (isLoading) {
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -671,7 +317,7 @@ export default function SprintDashboard() {
        {selectedSprint && <EditSprintDialog isOpen={isEditSprintOpen} setIsOpen={setIsEditSprintOpen} sprint={selectedSprint} onUpdateSprint={(s) => handleUpdateSprint(s)} />}
        <AddTaskDialog isOpen={isAddTaskOpen} setIsOpen={setIsAddTaskOpen} onAddTask={handleAddTask} />
        <LogProgressDialog isOpen={isLogProgressOpen} setIsOpen={setIsLogProgressOpen} sprint={selectedSprint} onLogProgress={handleLogProgress} taskToLog={taskToLog} onClose={() => setTaskToLog(null)} />
-       <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUpload(handleBulkUploadTasks, selectedSprint.tickets || [])} onBulkLogProgress={handleBulkUpload(handleBulkLogProgress, selectedSprint.tickets || [])} />
+       <BulkUploadDialog isOpen={isBulkUploadOpen} setIsOpen={setIsBulkUploadOpen} onBulkUploadTasks={handleBulkUploadTasks} onBulkLogProgress={handleBulkLogProgress} />
 
       <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
@@ -833,23 +479,47 @@ export default function SprintDashboard() {
               </TabsList>
           
               <TabsContent value="tasks" className="mt-4">
-                <SprintTasksView
-                    columns={columns}
-                    data={processedSprint.tickets || []}
-                    sprint={processedSprint}
-                    onUpdateTask={handleUpdateTask}
-                    onDeleteTask={handleDeleteTask}
-                    onLogTime={handleLogRowAction}
-                    onOpenAddTask={() => setIsAddTaskOpen(true)}
-                    onOpenBulkUpload={() => {
-                        setUndoState({ tickets: selectedSprint.tickets || [] });
-                        setIsBulkUploadOpen(true);
-                    }}
-                    onOpenLogProgress={() => {
-                        setTaskToLog(null);
-                        setIsLogProgressOpen(true);
-                    }}
-                />
+                <Card>
+                    <CardHeader>
+                       <DataTableToolbar
+                            table={null as any} // This will be managed inside SprintTasksView
+                            viewMode={'list'}
+                            onViewModeChange={() => {}}
+                            groupBy={null}
+                            onGroupByChange={() => {}}
+                            showInitialScopeOnly={false}
+                            onShowInitialScopeOnlyChange={() => {}}
+                            taskCount={processedSprint.tickets?.length || 0}
+                            isSprintCompleted={isSprintCompleted}
+                            onOpenAddTask={() => setIsAddTaskOpen(true)}
+                            onOpenBulkUpload={() => {
+                                setIsBulkUploadOpen(true);
+                            }}
+                            onOpenLogProgress={() => {
+                                setTaskToLog(null);
+                                setIsLogProgressOpen(true);
+                            }}
+                        />
+                    </CardHeader>
+                    <CardContent>
+                      <SprintTasksView
+                          columns={columns}
+                          data={processedSprint.tickets || []}
+                          sprint={processedSprint}
+                          onUpdateTask={handleUpdateTask}
+                          onDeleteTask={handleDeleteTask}
+                          onLogTime={handleLogRowAction}
+                          onOpenAddTask={() => setIsAddTaskOpen(true)}
+                          onOpenBulkUpload={() => {
+                              setIsBulkUploadOpen(true);
+                          }}
+                          onOpenLogProgress={() => {
+                              setTaskToLog(null);
+                              setIsLogProgressOpen(true);
+                          }}
+                      />
+                    </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="analytics" className="mt-4">

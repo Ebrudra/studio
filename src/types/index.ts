@@ -1,3 +1,4 @@
+export * from './data-provider';
 
 export type Team = 'Backend' | 'iOS' | 'Web' | 'Android';
 export type TicketType = 'User story' | 'Bug' | 'Task' | 'Buffer';

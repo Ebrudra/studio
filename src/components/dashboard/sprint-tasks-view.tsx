@@ -27,16 +27,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 import { DataTablePagination } from "./data-table-pagination"
 import { DataTableToolbar } from "./data-table-toolbar"
 import { TaskCard } from "./task-card"
 import type { Sprint, Ticket } from "@/types"
-import { Button } from "../ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
-import { FileText, Plus, Upload } from "lucide-react"
 
 interface SprintTasksViewProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -338,54 +334,48 @@ export function SprintTasksView<TData extends Ticket, TValue>({
   }, [allFilteredTasks, data]);
 
   return (
-    <Card>
-        <CardHeader>
-            <DataTableToolbar
-                table={table}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                groupBy={groupBy}
-                onGroupByChange={setGroupBy}
-                showInitialScopeOnly={showInitialScopeOnly}
-                onShowInitialScopeOnlyChange={setShowInitialScopeOnly}
-                taskCount={(data || []).length}
-                isSprintCompleted={sprint.status === 'Completed'}
-                onOpenAddTask={onOpenAddTask}
-                onOpenBulkUpload={onOpenBulkUpload}
-                onOpenLogProgress={onOpenLogProgress}
-            />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {renderContent(table)}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                <div className="text-center p-3 bg-success/10 rounded-lg border">
-                  <div className="text-2xl font-bold text-success">
-                    {allFilteredTasks.filter((t) => t.status === "Done").length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Completed</div>
-                </div>
-                <div className="text-center p-3 bg-primary/10 rounded-lg border">
-                  <div className="text-2xl font-bold text-primary">
-                    {allFilteredTasks.filter((t) => t.status === "Doing").length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">In Progress</div>
-                </div>
-                <div className="text-center p-3 bg-warning/10 rounded-lg border">
-                  <div className="text-2xl font-bold text-warning-foreground">
-                    {totalEstimated.toFixed(1)}h
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total Estimated</div>
-                </div>
-                <div className="text-center p-3 bg-muted/50 rounded-lg border">
-                  <div className="text-2xl font-bold text-foreground">
-                    {totalLogged.toFixed(1)}h
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total Logged</div>
-                </div>
+    <div className="space-y-4">
+        <DataTableToolbar
+            table={table}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
+            showInitialScopeOnly={showInitialScopeOnly}
+            onShowInitialScopeOnlyChange={setShowInitialScopeOnly}
+            taskCount={(data || []).length}
+            isSprintCompleted={sprint.status === 'Completed'}
+            onOpenAddTask={onOpenAddTask}
+            onOpenBulkUpload={onOpenBulkUpload}
+            onOpenLogProgress={onOpenLogProgress}
+        />
+        {renderContent(table)}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+            <div className="text-center p-3 bg-success/10 rounded-lg border">
+              <div className="text-2xl font-bold text-success">
+                {allFilteredTasks.filter((t) => t.status === "Done").length}
+              </div>
+              <div className="text-xs text-muted-foreground">Completed</div>
             </div>
-          </div>
-        </CardContent>
-    </Card>
+            <div className="text-center p-3 bg-primary/10 rounded-lg border">
+              <div className="text-2xl font-bold text-primary">
+                {allFilteredTasks.filter((t) => t.status === "Doing").length}
+              </div>
+              <div className="text-xs text-muted-foreground">In Progress</div>
+            </div>
+            <div className="text-center p-3 bg-warning/10 rounded-lg border">
+              <div className="text-2xl font-bold text-warning-foreground">
+                {totalEstimated.toFixed(1)}h
+              </div>
+              <div className="text-xs text-muted-foreground">Total Estimated</div>
+            </div>
+            <div className="text-center p-3 bg-muted/50 rounded-lg border">
+              <div className="text-2xl font-bold text-foreground">
+                {totalLogged.toFixed(1)}h
+              </div>
+              <div className="text-xs text-muted-foreground">Total Logged</div>
+            </div>
+        </div>
+      </div>
   )
 }
