@@ -36,5 +36,5 @@ pnpm-debug.log*
 next-env.d.ts
 
 # generated data
-/data/
+#/data/
 .env
